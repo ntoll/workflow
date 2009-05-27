@@ -62,19 +62,23 @@ Put simply, a transition is an edge in a directed graph. Roles associated with
 each transition indicate *who* can use the transition to move the workflow to a
 new state.
 
+EventType - just defines the name of a type of event. Examples might be:
+meeting, assessment, interview, deployment test, feature freeze and so on.
+
 Event - is a specification for something that is supposed to happen whilst in
 this state. In the HR project events might be: 'Meeting to approve job
 specification', 'Meeting of review board' or 'Contact all managers conducting
 employee interviews'. The issue tracker might have: 'Check for duplicate issue',
 'Check unit tests pass on staging server'. The roles field indicates *who* is to
-participate in the event. In my original application I included fields for cost
-estimation and an is_mandatory flag. 
+participate in the event. I've also included fields for cost estimation and an
+is_mandatory flag. An event can be associated with many EventTypes.
 
 WorkflowManager - is a core model to link "things" to workflows in a similar way
 to User objects having a profile. Vacancy and Issue instances in the HR and
 issue tracker examples should reference a WorkflowManager. The WorkflowManager
 simply references an active Workflow and contains created_on and completed_on
-timestamps.
+timestamps. The various methods associated with this model should be used move
+through the life of the workflow.
 
 Participant - links django.contrib.auth.models.User instances to a Role and 
 WorkflowManager. This way we know that user 'Joe Blogs' has the role 'Hiring 
