@@ -87,10 +87,10 @@ Hiring Process' workflow. We might also know that jtauber is Release Manager
 during the lifetime of the WorkflowManager for Pinax1.0 that follows the Release 
 Lifecycle workflow.
 
-WorkflowEvent - simply links up the WorkflowManager, State, Transition that got
-to the State, Participant and a timestamp enabling us to know how the workflow 
-has progressed (with the most recent being the current state). Examples might 
-be: Pinax1.0 WorkflowManager, "RC1" state, "Prepare Release Candidate"
-transition, jtauber, 2009-11-5.
+WorkflowHistory - simply links up the WorkflowManager, State, Transition and
+Events to the State, Participant, a descriptive note and a timestamp enabling 
+us to track how the workflow has progressed (with the most recent being the 
+current state). Examples might be: Pinax1.0 WorkflowManager, "RC1" state, 
+"Prepare Release Candidate" transition, jtauber, 2009-11-5.
 
 As always, comments, ideas, suggestions and improvements are most welcome.
