@@ -280,6 +280,8 @@ class Workflow(models.Model):
                 clone_trans.from_state = state_dict[tr.from_state.id]
                 clone_trans.to_state = state_dict[tr.to_state.id]
                 clone_trans.save()
+                for r in tr.roles.all():
+                    clone_trans.roles.add(r)
             # Clone the events
             for ev in self.events.all():
                 clone_event = Event()
@@ -405,7 +407,8 @@ class Transition(models.Model):
     name = models.CharField(
             _('Name of transition'),
             max_length=128,
-            help_text=_('Use an "active" verb. e.g. "Close Issue"')
+            help_text=_('Use an "active" verb. e.g. "Close Issue", "Open'\
+                ' Vacancy" or "Start Interviews"')
             )
     # This field is the result of denormalization to help with the Workflow 
     # class's clone() method.
@@ -483,9 +486,10 @@ class Event(models.Model):
             decimal_places=2,
             blank=True,
             null=True,
-            help_text=_('The estimated cost (if any) of this event'))
+            help_text=_('The estimated cost (if any) of this event')
+            )
     # If this field is true then the workflow cannot progress beyond the related
-    # state
+    # state without it first appearing in the workflow history
     is_mandatory = models.BooleanField(
             _('Mandatory event'),
             default=False,
@@ -555,6 +559,7 @@ class WorkflowManager(models.Model):
                 deadline=start_state_result[0].deadline()
             )
         first_step.save()
+        return first_step
 
     def progress(self, transition, participant):
         """
@@ -562,8 +567,8 @@ class WorkflowManager(models.Model):
         requested by the specified participant.
 
         The transition is validated (to make sure it is a legal "move" in the
-        directed graph and the method return the new WorkflowHistory state or
-        raise an UnableToProgressWorkflow exception
+        directed graph) and the method returns the new WorkflowHistory state or
+        raises an UnableToProgressWorkflow exception.
         """
         # Validate the transition
         current_state = self.current_state()
