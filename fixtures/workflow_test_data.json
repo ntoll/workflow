@@ -446,7 +446,6 @@
         2
       ], 
       "workflow": 1, 
-      "estimated_cost": null, 
       "state": 2, 
       "event_types": [
         1, 
@@ -466,7 +465,6 @@
         2
       ], 
       "workflow": 1, 
-      "estimated_cost": "150", 
       "state": 3, 
       "event_types": [
         1, 
@@ -487,7 +485,6 @@
         3
       ], 
       "workflow": 1, 
-      "estimated_cost": "500", 
       "state": 8, 
       "event_types": [
         2

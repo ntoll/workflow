@@ -289,7 +289,6 @@ class Workflow(models.Model):
                 clone_event.description = ev.description
                 clone_event.workflow = clone_workflow
                 clone_event.state = state_dict[ev.state.id]
-                clone_event.estimated_cost = ev.estimated_cost
                 clone_event.is_mandatory = ev.is_mandatory
                 clone_event.save()
                 for r in ev.roles.all():
@@ -479,15 +478,6 @@ class Event(models.Model):
     # For example, a meeting and review (an event might be of more than one
     # type)
     event_types = models.ManyToManyField(EventType)
-    # For the purposes of budgeting and cost estimation 
-    estimated_cost = models.DecimalField(
-            _('Cost'),
-            max_digits=20,
-            decimal_places=2,
-            blank=True,
-            null=True,
-            help_text=_('The estimated cost (if any) of this event')
-            )
     # If this field is true then the workflow cannot progress beyond the related
     # state without it first appearing in the workflow history
     is_mandatory = models.BooleanField(
