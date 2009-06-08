@@ -84,7 +84,8 @@ the "active" state so it can be used.
 
 >>> wf.activate()
 
-Lets set up a workflow manager and assign roles to users for a new document
+Lets set up a workflow manager and assign roles to users for a new document so
+we can interact with the workflow we defined above.
 
 >>> wm = WorkflowManager(workflow=wf, created_by=fred)
 >>> wm.save()
@@ -99,7 +100,7 @@ Starting the workflow via the workflow manager is easy... notice we have to pass
 the participant and that the method returns the current state.
 
 >>> d.workflow_manager.start(p1)
-<WorkflowHistory: WorkflowHistory object>
+<WorkflowHistory: Started workflow by fred (author)>
 
 The WorkflowManager's current_state() method does exactly what it says. You can
 find out lots of interesting things...
@@ -121,7 +122,7 @@ and submits it for approval)
 >>> my_transition
 <Transition: Request Approval>
 >>> d.workflow_manager.progress(my_transition, p1)
-<WorkflowHistory: WorkflowHistory object>
+<WorkflowHistory: Request Approval by fred (author)>
 
 Notice the WorkflowManager's progress method returns the new state. What is 
 current_state() telling us..?
@@ -138,26 +139,28 @@ u'Request Approval'
 >>> current.state.events.all()
 [<Event: Approval Meeting>]
 
-So we have an event associated with this event. Lets pretend it's happened
+So we have an event associated with this event. Lets pretend it's happened.
+Notice that I can pass a bespoke "note" to store against the event.
 
 >>> my_event = current.state.events.all()[0]
->>> d.workflow_manager.log_event(my_event, p2)
-<WorkflowHistory: WorkflowHistory object>
+>>> d.workflow_manager.log_event(my_event, p2, "A great review meeting, loved the punchline!")
+<WorkflowHistory: A great review meeting, loved the punchline! by joe (boss)>
 >>> current = d.workflow_manager.current_state()
 >>> current.state
 <State: Under Review>
 >>> current.event
 <Event: Approval Meeting>
 >>> current.note
-u'Approval Meeting'
+u'A great review meeting, loved the punchline!'
 
-Continue with the progress of the workflow manager...
+Continue with the progress of the workflow manager... Notice I can also pass a
+bespoke "note" to the progress method.
 
 >>> current.state.transitions_from.all()
 [<Transition: Revise Draft>, <Transition: Publish>]
 >>> my_transition = current.state.transitions_from.all()[1]
->>> d.workflow_manager.progress(my_transition, p2)
-<WorkflowHistory: WorkflowHistory object>
+>>> d.workflow_manager.progress(my_transition, p2, "We'll be up for a Pulitzer")
+<WorkflowHistory: We'll be up for a Pulitzer by joe (boss)>
 
 Lets finish the workflow just to demonstrate what useful stuff is logged:
 
@@ -166,13 +169,13 @@ Lets finish the workflow just to demonstrate what useful stuff is logged:
 [<Transition: Archive>]
 >>> my_transition = current.state.transitions_from.all()[0]
 >>> d.workflow_manager.progress(my_transition, p2)
-<WorkflowHistory: WorkflowHistory object>
+<WorkflowHistory: Archive by joe (boss)>
 >>> for item in d.workflow_manager.history.all():
 ...     print '%s by %s'%(item.note, item.participant.user.username)
 ... 
 Archive by joe
-Publish by joe
-Approval Meeting by joe
+We'll be up for a Pulitzer by joe
+A great review meeting, loved the punchline! by joe
 Request Approval by fred
 Started workflow by fred
 

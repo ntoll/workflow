@@ -748,6 +748,9 @@ class WorkflowHistory(models.Model):
         elif self.state.is_end_state:
             workflow_ended.send(sender=self.workflowmanager)
 
+    def __unicode__(self):
+        return u"%s by %s"%(self.note, self.participant.__unicode__())
+
     class Meta:
         ordering = ['-created_on']
         verbose_name = _('Workflow History')
