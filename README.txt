@@ -8,7 +8,8 @@ This Django application provides a workflow engine for use in your
 web-application. This work is an abstraction of / extraction from a workflow
 engine built for an HR application.
 
-Currently only the models have been "extracted". 
+Currently only the models have been "extracted". Commented doctests can be 
+found in tests.py.
 
 To make things easy I've described each model below and made up a couple of 
 "user stories" to illustrate how stuff fits together (an Applicant Tracking 
