@@ -14,10 +14,10 @@ A document class that really should be a models.Model class (but you get the
 idea)
 
 >>> class Document():
-...     def __init__(self, title, body, workflow):
+...     def __init__(self, title, body, workflow_manager):
 ...             self.title = title
 ...             self.body = body
-...             self.workflow = workflow
+...             self.workflow_manager = workflow_manager
 ... 
 
 Roles define the sort of person involved in a workflow.
@@ -93,18 +93,18 @@ Lets set up a workflow manager and assign roles to users for a new document
 >>> p1.save()
 >>> p2 = Participant(user=joe, role=boss, workflowmanager=wm)
 >>> p2.save()
->>> d = Document(title='Had..?', body="Bob, where Alice had had 'had', had had 'had had'; 'had had' had had the examiner's approval", workflow=wm)
+>>> d = Document(title='Had..?', body="Bob, where Alice had had 'had', had had 'had had'; 'had had' had had the examiner's approval", workflow_manager=wm)
 
-Starting the workflow is easy... notice we have to pass the participant and that
-the method returns the current state.
+Starting the workflow via the workflow manager is easy... notice we have to pass
+the participant and that the method returns the current state.
 
->>> d.workflow.start(p1)
+>>> d.workflow_manager.start(p1)
 <WorkflowHistory: WorkflowHistory object>
 
 The WorkflowManager's current_state() method does exactly what it says. You can
 find out lots of interesting things...
 
->>> current = d.workflow.current_state()
+>>> current = d.workflow_manager.current_state()
 >>> current.participant
 <Participant: fred (author)>
 >>> current.note
@@ -120,13 +120,13 @@ and submits it for approval)
 >>> my_transition = current.state.transitions_from.all()[0]
 >>> my_transition
 <Transition: Request Approval>
->>> d.workflow.progress(my_transition, p1)
+>>> d.workflow_manager.progress(my_transition, p1)
 <WorkflowHistory: WorkflowHistory object>
 
 Notice the WorkflowManager's progress method returns the new state. What is 
 current_state() telling us..?
 
->>> current = d.workflow.current_state()
+>>> current = d.workflow_manager.current_state()
 >>> current.state
 <State: Under Review>
 >>> current.state.roles.all()
@@ -141,9 +141,9 @@ u'Request Approval'
 So we have an event associated with this event. Lets pretend it's happened
 
 >>> my_event = current.state.events.all()[0]
->>> d.workflow.log_event(my_event, p2)
+>>> d.workflow_manager.log_event(my_event, p2)
 <WorkflowHistory: WorkflowHistory object>
->>> current = d.workflow.current_state()
+>>> current = d.workflow_manager.current_state()
 >>> current.state
 <State: Under Review>
 >>> current.event
@@ -156,18 +156,18 @@ Continue with the progress of the workflow manager...
 >>> current.state.transitions_from.all()
 [<Transition: Revise Draft>, <Transition: Publish>]
 >>> my_transition = current.state.transitions_from.all()[1]
->>> d.workflow.progress(my_transition, p2)
+>>> d.workflow_manager.progress(my_transition, p2)
 <WorkflowHistory: WorkflowHistory object>
 
 Lets finish the workflow just to demonstrate what useful stuff is logged:
 
->>> current = d.workflow.current_state()
+>>> current = d.workflow_manager.current_state()
 >>> current.state.transitions_from.all()
 [<Transition: Archive>]
 >>> my_transition = current.state.transitions_from.all()[0]
->>> d.workflow.progress(my_transition, p2)
+>>> d.workflow_manager.progress(my_transition, p2)
 <WorkflowHistory: WorkflowHistory object>
->>> for item in d.workflow.history.all():
+>>> for item in d.workflow_manager.history.all():
 ...     print '%s by %s'%(item.note, item.participant.user.username)
 ... 
 Archive by joe
