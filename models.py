@@ -561,7 +561,7 @@ class WorkflowManager(models.Model):
         first_step.save()
         return first_step
 
-    def progress(self, transition, participant):
+    def progress(self, transition, participant, note=''):
         """
         Attempts to progress a workflow manager with the specified transition as
         requested by the specified participant.
@@ -591,12 +591,14 @@ class WorkflowManager(models.Model):
         # The "progress" request has been validated to store the transition into
         # the appropriate WorkflowHistory record and if it is an end state then
         # update this WorkflowManager's record with the appropriate timestamp
+        if not note:
+            note = transition.name
         wh = WorkflowHistory(
                 workflowmanager=self,
                 state=transition.to_state,
                 transition=transition,
                 participant=participant,
-                note=transition.name,
+                note=note,
                 deadline=transition.to_state.deadline()
                 )
         wh.save()
@@ -607,7 +609,7 @@ class WorkflowManager(models.Model):
             self.save()
         return wh
 
-    def log_event(self, event, participant):
+    def log_event(self, event, participant, note=''):
         """
         Logs the occurance of an event in the WorkflowHistory of a 
         WorkflowManager and returns the resulting record.
@@ -632,13 +634,15 @@ class WorkflowManager(models.Model):
             if not event.state == current_state.state:
                 raise UnableToLogWorkflowEvent, __('The mandatory event is'\
                         ' not associated with the current state')
+        if not note:
+            note=event.name
         # Good to go...
         wh = WorkflowHistory(
                 workflowmanager=self,
                 state=current_state.state,
                 event=event,
                 participant=participant,
-                note=event.name,
+                note=note,
                 deadline=current_state.deadline
                 )
         wh.save()

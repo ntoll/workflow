@@ -397,9 +397,11 @@ class ModelTestCase(TestCase):
             # Lets log the event and make sure we *can* progress
             e = Event.objects.get(id=1)
             wm.log_event(e, p)
-            wm.progress(tr2, p)
+            # Lets progress with a custom note
+            wm.progress(tr2, p, 'A Test')
             s3 = State.objects.get(id=3)
             self.assertEqual(s3, wm.current_state().state)
+            self.assertEqual('A Test', wm.current_state().note)
             # 3. The participant has the correct role to make the transition
             r2 = Role.objects.get(id=2)
             p2 = Participant(user=u, role=r2, workflowmanager=wm)
@@ -503,6 +505,13 @@ class ModelTestCase(TestCase):
             self.assertEqual(e2, wh.event)
             self.assertEqual(p, wh.participant)
             self.assertEqual(e2.name, wh.note)
+            # Lets log a second event of this type and make sure we handle the
+            # bespoke note
+            wh = wm.log_event(e2, p, 'A Test')
+            self.assertEqual(s3, wh.state)
+            self.assertEqual(e2, wh.event)
+            self.assertEqual(p, wh.participant)
+            self.assertEqual('A Test', wh.note)
 
         def test_workflowmanager_force_stop(self):
             """
