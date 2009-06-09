@@ -56,7 +56,7 @@ class ModelTestCase(TestCase):
                 w.activate()
             except Exception, instance:
                 self.assertEqual(u'Only workflows in the "definition" state may'\
-                        ' be activated', instance.message) 
+                        ' be activated', instance.args[0]) 
             else:
                 self.fail('Exception expected but not thrown')
             w.status=Workflow.DEFINITION
@@ -71,7 +71,7 @@ class ModelTestCase(TestCase):
                 w.activate()
             except Exception, instance:
                 self.assertEqual(u'There must be only one start state', 
-                        instance.message)
+                        instance.args[0])
             else:
                 self.fail('Exception expected but not thrown')
             # >1 start states
@@ -84,7 +84,7 @@ class ModelTestCase(TestCase):
                 w.activate()
             except Exception, instance:
                 self.assertEqual(u'There must be only one start state', 
-                        instance.message)
+                        instance.args[0])
             else:
                 self.fail('Exception expected but not thrown')
             state2.is_start_state=False
@@ -100,7 +100,7 @@ class ModelTestCase(TestCase):
                 w.activate()
             except Exception, instance:
                 self.assertEqual(u'There must be at least one end state', 
-                        instance.message)
+                        instance.args[0])
             else:
                 self.fail('Exception expected but not thrown')
             for state in end_states:
@@ -116,7 +116,7 @@ class ModelTestCase(TestCase):
                 self.assertEqual(u'There is an orphaned state associated with'\
                         ' this workflow (i.e. there is no way to get to it'\
                         ' from the start state): orphaned_state', 
-                        instance.message)
+                        instance.args[0])
             else:
                 self.fail('Exception expected but not thrown')
             orphan_state.delete()
@@ -132,7 +132,7 @@ class ModelTestCase(TestCase):
                 self.assertEqual(u'There is a state with no transitions from it'\
                         ' that is not an end state (i.e. it is a dead end):'\
                         ' %s'%cul_de_sac.name, 
-                        instance.message)
+                        instance.args[0])
             else:
                 self.fail('Exception expected but not thrown')
             cul_de_sac.is_end_state = True
@@ -153,7 +153,7 @@ class ModelTestCase(TestCase):
                         ' to the participants associated with its source state'\
                         ' (so it can never be used): %s'%(
                                 transition.name),
-                                instance.message
+                                instance.args[0]
                                 )
             else:
                 self.fail('Exception expected but not thrown')
@@ -190,7 +190,7 @@ class ModelTestCase(TestCase):
                 w.clone(u)
             except Exception, instance:
                 self.assertEqual(u'Only active or retired workflows may be'\
-                        ' cloned', instance.message)
+                        ' cloned', instance.args[0])
             else:
                 self.fail('Exception expected but not thrown')
             w.activate()
@@ -317,7 +317,7 @@ class ModelTestCase(TestCase):
             try:
                 wm.start(p)
             except Exception, instance:
-                self.assertEqual(u'Already completed', instance.message)
+                self.assertEqual(u'Already completed', instance.args[0])
             else:
                 self.fail('Exception expected but not thrown')
             wm = WorkflowManager(workflow=w, created_by=u)
@@ -331,7 +331,7 @@ class ModelTestCase(TestCase):
                 wm.start(p)
             except Exception, instance:
                 self.assertEqual(u'Cannot find single start state', 
-                        instance.message)
+                        instance.args[0])
             else:
                 self.fail('Exception expected but not thrown')
             s2.is_start_state=False
@@ -350,7 +350,7 @@ class ModelTestCase(TestCase):
             try:
                 wm.start(p)
             except Exception, instance:
-                self.assertEqual(u'Already started', instance.message)
+                self.assertEqual(u'Already started', instance.args[0])
             else:
                 self.fail('Exception expected but not thrown')
 
@@ -375,7 +375,7 @@ class ModelTestCase(TestCase):
                 wm.progress(tr5, p)
             except Exception, instance:
                 self.assertEqual(u'Transition not valid (wrong parent)', 
-                        instance.message)
+                        instance.args[0])
             else:
                 self.fail('Exception expected but not thrown')
             # Lets test again with a valid transition with the correct
@@ -391,7 +391,7 @@ class ModelTestCase(TestCase):
                 wm.progress(tr2, p)
             except Exception, instance:
                 self.assertEqual(u'Transition not valid (mandatory event'\
-                        ' missing)', instance.message)
+                        ' missing)', instance.args[0])
             else:
                 self.fail('Exception expected but not thrown')
             # Lets log the event and make sure we *can* progress
@@ -410,7 +410,7 @@ class ModelTestCase(TestCase):
                 wm.progress(tr4, p2)
             except Exception, instance:
                 self.assertEqual(u'Participant has insufficient authority to'\
-                        ' use the specified transition', instance.message)
+                        ' use the specified transition', instance.args[0])
             else:
                 self.fail('Exception expected but not thrown')
             # We have the good transition so make sure everything is logged in
@@ -463,7 +463,7 @@ class ModelTestCase(TestCase):
                 wm.log_event(dummy_event, p)
             except Exception, instance:
                 self.assertEqual(u'The event is not associated with the'\
-                        ' workflow for the WorkflowManager', instance.message)
+                        ' workflow for the WorkflowManager', instance.args[0])
             else:
                 self.fail('Exception expected but not thrown')
             # 2. Make sure the participant has the correct role to log the event
@@ -478,7 +478,7 @@ class ModelTestCase(TestCase):
                 wm.log_event(e1, p2)
             except Exception, instance:
                 self.assertEqual(u'The participant is not associated with the'\
-                        ' specified event', instance.message)
+                        ' specified event', instance.args[0])
             else:
                 self.fail('Exception expected but not thrown')
             # Try again but with the right profile
@@ -492,7 +492,7 @@ class ModelTestCase(TestCase):
                 wm.log_event(e2, p)
             except Exception, instance:
                 self.assertEqual(u'The mandatory event is not associated with'\
-                        ' the current state', instance.message)
+                        ' the current state', instance.args[0])
             else:
                 self.fail('Exception expected but not thrown')
             # Save a good event instance and check everything is logged in the
