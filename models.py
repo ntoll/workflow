@@ -84,9 +84,15 @@ role_assigned = django.dispatch.Signal()
 # Fired when a new workflow_manager starts navigating a workflow. The sender is
 # an instance of the WorkflowManager model
 workflow_started = django.dispatch.Signal()
-# Fired when a workflow_manager progresses to a new state via a transition (the
+# Fired just before a WorkflowManager creates a new item in the Workflow History
+# (the sender is an instance of the WorkflowHistory model)
+workflow_pre_workflow_change = django.dispatch.Signal()
+# Fired after a WorkflowManager creates a new item in the Workflow History (the
 # sender is an instance of the WorkflowHistory model)
-workflow_progressed = django.dispatch.Signal() 
+workflow_post_workflow_change = django.dispatch.Signal() 
+# Fired when a WorkflowManager causes a transition to a new state (the sender is
+# an instance of the WorkflowHistory model)
+workflow_transitioned = django.dispatch.Signal()
 # Fired when some event happens during the life of a workflow_manager (the 
 # sender is an instance of the WorkflowHistory model)
 workflow_event_completed = django.dispatch.Signal()
@@ -737,10 +743,11 @@ class WorkflowHistory(models.Model):
             )
 
     def save(self):
+        workflow_pre_workflow_change.send(sender=self)
         super(WorkflowHistory, self).save()
-        # Various signals
+        workflow_post_workflow_change.send(sender=self)
         if self.transition:
-            workflow_progressed.send(sender=self)
+            workflow_transitioned.send(sender=self)
         if self.event:
             workflow_event_completed.send(sender=self)
         if self.state.is_start_state:
