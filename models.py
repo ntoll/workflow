@@ -86,10 +86,10 @@ role_assigned = django.dispatch.Signal()
 workflow_started = django.dispatch.Signal()
 # Fired just before a WorkflowManager creates a new item in the Workflow History
 # (the sender is an instance of the WorkflowHistory model)
-workflow_pre_workflow_change = django.dispatch.Signal()
+workflow_pre_change = django.dispatch.Signal()
 # Fired after a WorkflowManager creates a new item in the Workflow History (the
 # sender is an instance of the WorkflowHistory model)
-workflow_post_workflow_change = django.dispatch.Signal() 
+workflow_post_change = django.dispatch.Signal() 
 # Fired when a WorkflowManager causes a transition to a new state (the sender is
 # an instance of the WorkflowHistory model)
 workflow_transitioned = django.dispatch.Signal()
@@ -743,9 +743,9 @@ class WorkflowHistory(models.Model):
             )
 
     def save(self):
-        workflow_pre_workflow_change.send(sender=self)
+        workflow_pre_change.send(sender=self)
         super(WorkflowHistory, self).save()
-        workflow_post_workflow_change.send(sender=self)
+        workflow_post_change.send(sender=self)
         if self.transition:
             workflow_transitioned.send(sender=self)
         if self.event:
