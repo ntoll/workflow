@@ -156,18 +156,18 @@ u'A great review meeting, loved the punchline!'
 Continue with the progress of the workflow manager... Notice I can also pass a
 bespoke "note" to the progress method.
 
->>> current.state.transitions_from.all()
+>>> current.state.transitions_from.all().order_by('id')
 [<Transition: Revise Draft>, <Transition: Publish>]
->>> my_transition = current.state.transitions_from.all()[1]
+>>> my_transition = current.state.transitions_from.all().order_by('id')[1]
 >>> d.workflow_manager.progress(my_transition, p2, "We'll be up for a Pulitzer")
 <WorkflowHistory: We'll be up for a Pulitzer by joe (boss)>
 
 Lets finish the workflow just to demonstrate what useful stuff is logged:
 
 >>> current = d.workflow_manager.current_state()
->>> current.state.transitions_from.all()
+>>> current.state.transitions_from.all().order_by('id')
 [<Transition: Archive>]
->>> my_transition = current.state.transitions_from.all()[0]
+>>> my_transition = current.state.transitions_from.all().order_by('id')[0]
 >>> d.workflow_manager.progress(my_transition, p2)
 <WorkflowHistory: Archive by joe (boss)>
 >>> for item in d.workflow_manager.history.all():
