@@ -24,6 +24,14 @@ class ModelTestCase(TestCase):
         # Reference fixtures here
         fixtures = ['workflow_test_data']
 
+        def test_workflow_unicode(self):
+            """
+            Makes sure that the slug field (name) is returned from a call to
+            __unicode__()
+            """
+            w = Workflow.objects.get(id=1)
+            self.assertEquals(u'Test Workflow', w.__unicode__())
+
         def test_workflow_lifecycle(self):
             """
             Makes sure the methods in the Workflow model work as expected
