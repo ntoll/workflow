@@ -683,6 +683,7 @@ class Participant(models.Model):
             WorkflowManager,
             related_name='participants'
             )
+    disabled = models.BooleanField(default=False)
 
     def save(self):
         super(Participant, self).save()
@@ -691,7 +692,10 @@ class Participant(models.Model):
     def __unicode__(self):
         username = self.user.get_full_name()
         username = username if username else self.user.username 
-        return u"%s (%s)"%(username, self.role.name)
+        name = self.role.name
+        if self.disabled:
+            name += ' - %s'%__('disabled')
+        return u"%s (%s)"%(username, name)
 
     class Meta:
         ordering = ['workflowmanager', 'role']

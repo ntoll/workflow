@@ -541,3 +541,20 @@ class ModelTestCase(TestCase):
             self.assertEqual(u'Workflow forced to stop! Reason given: foo',
                     wh.note)
             self.assertEqual(None, wh.deadline)
+
+        def test_participant_unicode(self):
+            """
+            Make sure the __unicode__() method returns the correct string in
+            both enabled / disabled states
+            """
+            w = Workflow.objects.get(id=1)
+            u = User.objects.get(id=1)
+            r = Role.objects.get(id=1)
+            wm = WorkflowManager(workflow=w, created_by=u)
+            wm.save()
+            p = Participant(user=u, role=r, workflowmanager=wm)
+            p.save()
+            self.assertEquals(u'test_admin (Administrator)', p.__unicode__())
+            p.disabled = True
+            p.save()
+            self.assertEquals(u'test_admin (Administrator - disabled)', p.__unicode__())
