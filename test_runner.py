@@ -6,7 +6,13 @@ code found here:
 
     http://www.thoughtspark.org/node/6
 
-To use this code modify your settings.py file with the following:
+You should also have coverage.py in your python path. See:
+
+    http://nedbatchelder.com/code/modules/coverage.html
+
+for more information.
+
+To use this test runner modify your settings.py file with the following:
 
 # Specify your custom test runner to use
 TEST_RUNNER='workflow.test_runner.test_runner_with_coverage'
