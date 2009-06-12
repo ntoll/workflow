@@ -27,10 +27,10 @@ You'll get a code coverage report for your unit tests:
  TOTAL              5      0     0%
 ------------------------------------------------------------------
 
-For every module added to COVERAGE_MODULES you'll get a report telling you the
+For every module added to COVERAGE_MODULES you'll get an entry telling you the
 number of executable statements, the number executed, the percentage executed
 and a list of the code lines not executed (in the above play example, no tests
-have been writted). Aim for 100%.
+have been written). Aim for 100% :-)
 
 !!!! WARNING !!!
 Use with care - this code works with the command:
