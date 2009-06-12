@@ -33,7 +33,10 @@ and a list of the code lines not executed (in the above play example, no tests
 have been written). Aim for 100% :-)
 
 !!!! WARNING !!!
-Use with care - this code works with the command:
+
+Because of the use of coverage, this test runner is SLOW.
+
+Also, use with care - this code works with the command:
 
     python manage.py test workflow
 
