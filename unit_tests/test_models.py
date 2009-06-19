@@ -48,6 +48,155 @@ class ModelTestCase(TestCase):
             w.retire()
             self.assertEquals(Workflow.RETIRED, w.status)
 
+        def test_workflow_is_valid(self):
+            """
+            Makes sure that the validation for a workflow works as expected
+            """
+            # from the fixtures
+            w = Workflow.objects.get(id=1)
+            self.assertEquals(Workflow.DEFINITION, w.status)
+
+            # make sure the workflow contains exactly one start state
+            # 0 start states
+            state1 = State.objects.get(id=1)
+            state1.is_start_state=False
+            state1.save()
+            self.assertEqual(False, w.is_valid())
+            self.assertEqual(True, u'There must be only one start state' in w.errors['workflow'])
+            state1.is_start_state=True
+            state1.save()
+
+            # >1 start states
+            state2 = State.objects.get(id=2)
+            state2.is_start_state=True
+            state2.save()
+            self.assertEqual(False, w.is_valid())
+            self.assertEqual(True, u'There must be only one start state' in w.errors['workflow'])
+            state2.is_start_state=False
+            state2.save()
+
+            # make sure we have at least one end state
+            # 0 end states
+            end_states = w.states.filter(is_end_state=True)
+            for state in end_states:
+                state.is_end_state=False
+                state.save()
+            self.assertEqual(False, w.is_valid())
+            self.assertEqual(True, u'There must be at least one end state' in w.errors['workflow'])
+            for state in end_states:
+                state.is_end_state=True
+                state.save()
+            
+            # make sure we don't have any orphan states 
+            orphan_state = State(name='orphaned_state', workflow=w)
+            orphan_state.save()
+            self.assertEqual(False, w.is_valid())
+            self.assertEqual(True, orphan_state.id in w.errors['states'])
+            msg = u'This state is orphaned. There is no way to get to it given'\
+                    ' the current workflow topology.'
+            self.assertEqual(True, msg in w.errors['states'][orphan_state.id])
+            orphan_state.delete()
+
+            # make sure we don't have any cul-de-sacs from which one can't
+            # escape (re-using an end state for the same effect)
+            cul_de_sac = end_states[0]
+            cul_de_sac.is_end_state = False
+            cul_de_sac.save()
+            self.assertEqual(False, w.is_valid())
+            self.assertEqual(True, cul_de_sac.id in w.errors['states'])
+            msg = u'This state is a dead end. It is not marked as an end state'\
+                    ' and there is no way to exit from it.'
+            self.assertEqual(True, msg in w.errors['states'][cul_de_sac.id])
+            cul_de_sac.is_end_state = True
+            cul_de_sac.save()
+
+            # make sure transition's roles are a subset of the roles associated
+            # with the transition's from_state (otherwise you'll have a
+            # transition that none of the participants for a state can make use
+            # of)
+            role = Role.objects.get(id=2)
+            transition = Transition.objects.get(id=10)
+            transition.roles.clear()
+            transition.roles.add(role)
+            self.assertEqual(False, w.is_valid())
+            self.assertEqual(True, transition.id in w.errors['transitions'])
+            msg = u'This transition is not navigable because none of the'\
+                ' roles associated with the parent state have permission to'\
+                ' use it.'
+            self.assertEqual(True, msg in w.errors['transitions'][transition.id])
+
+            # so all the potential pitfalls have been vaidated. Lets make sure
+            # we *can* validate it as expected.
+            transition.roles.clear()
+            admin_role = Role.objects.get(id=1)
+            staff_role = Role.objects.get(id=3)
+            transition.roles.add(admin_role)
+            transition.roles.add(staff_role)
+            self.assertEqual(True, w.is_valid())
+            self.assertEqual([], w.errors['workflow'])
+            self.assertEqual({}, w.errors['states'])
+            self.assertEqual({}, w.errors['transitions'])
+
+        def test_workflow_has_errors(self):
+            """
+            Ensures that has_errors() returns the appropriate response for all
+            possible circumstances
+            """
+            # Some housekeepeing
+            w = Workflow.objects.get(id=1)
+            u = User.objects.get(id=1)
+            w.activate()
+            w2 = w.clone(u)
+
+            # A state with no errors
+            state1 = State.objects.get(id=1)
+            w.is_valid()
+            self.assertEqual([], w.has_errors(state1))
+
+            # A state with errors
+            state1.is_start_state = False
+            state1.save()
+            w.is_valid()
+            msg = u'This state is orphaned. There is no way to get to it given'\
+                    ' the current workflow topology.'
+            self.assertEqual([msg], w.has_errors(state1))
+            
+            # A transition with no errors
+            transition = Transition.objects.get(id=10)
+            w.is_valid()
+            self.assertEqual([], w.has_errors(transition))
+
+            # A transition with errors
+            role = Role.objects.get(id=2)
+            transition.roles.clear()
+            transition.roles.add(role)
+            w.is_valid()
+            msg = u'This transition is not navigable because none of the'\
+                ' roles associated with the parent state have permission to'\
+                ' use it.'
+            self.assertEqual([msg], w.has_errors(transition))
+
+            # A state not associated with the workflow
+            state2 = w2.states.all()[0]
+            state2.is_start_state = False
+            state2.save()
+            w.is_valid()
+            # The state is a problem state but isn't anything to do with the
+            # workflow w
+            self.assertEqual([], w.has_errors(state2))
+
+            # A transition not associated with the workflow
+            transition2 = w2.transitions.all()[0]
+            transition2.roles.clear()
+            w.is_valid()
+            # The transition has a problem but isn't anything to do with the
+            # workflow w
+            self.assertEqual([], w.has_errors(transition2))
+
+            # Something not either a state or transition (e.g. a string)
+            w.is_valid()
+            self.assertEqual([], w.has_errors("Test"))
+
         def test_workflow_activate_validation(self):
             """
             Makes sure that the appropriate validation of a workflow happens
@@ -70,109 +219,23 @@ class ModelTestCase(TestCase):
             w.status=Workflow.DEFINITION
             w.save()
 
-            # make sure the workflow contains exactly one start state
-            # 0 start states
+            # Lets make sure the workflow is validated before being activated by
+            # making sure the workflow in not valid
             state1 = State.objects.get(id=1)
             state1.is_start_state=False
             state1.save()
             try:
                 w.activate()
             except Exception, instance:
-                self.assertEqual(u'There must be only one start state', 
-                        instance.args[0])
+                self.assertEqual(u"Cannot activate as the workflow doesn't"\
+                        " validate.", instance.args[0])
             else:
                 self.fail('Exception expected but not thrown')
-            # >1 start states
             state1.is_start_state=True
             state1.save()
-            state2 = State.objects.get(id=2)
-            state2.is_start_state=True
-            state2.save()
-            try:
-                w.activate()
-            except Exception, instance:
-                self.assertEqual(u'There must be only one start state', 
-                        instance.args[0])
-            else:
-                self.fail('Exception expected but not thrown')
-            state2.is_start_state=False
-            state2.save()
-
-            # make sure we have at least one end state
-            # 0 end states
-            end_states = w.states.filter(is_end_state=True)
-            for state in end_states:
-                state.is_end_state=False
-                state.save()
-            try:
-                w.activate()
-            except Exception, instance:
-                self.assertEqual(u'There must be at least one end state', 
-                        instance.args[0])
-            else:
-                self.fail('Exception expected but not thrown')
-            for state in end_states:
-                state.is_end_state=True
-                state.save()
             
-            # make sure we don't have any orphan nodes
-            orphan_state = State(name='orphaned_state', workflow=w)
-            orphan_state.save()
-            try:
-                w.activate()
-            except Exception, instance:
-                self.assertEqual(u'There is an orphaned state associated with'\
-                        ' this workflow (i.e. there is no way to get to it'\
-                        ' from the start state): orphaned_state', 
-                        instance.args[0])
-            else:
-                self.fail('Exception expected but not thrown')
-            orphan_state.delete()
-
-            # make sure we don't have any cul-de-sacs from which one can't
-            # escape (re-using an end state for the same effect)
-            cul_de_sac = end_states[0]
-            cul_de_sac.is_end_state = False
-            cul_de_sac.save()
-            try:
-                w.activate()
-            except Exception, instance:
-                self.assertEqual(u'There is a state with no transitions from it'\
-                        ' that is not an end state (i.e. it is a dead end):'\
-                        ' %s'%cul_de_sac.name, 
-                        instance.args[0])
-            else:
-                self.fail('Exception expected but not thrown')
-            cul_de_sac.is_end_state = True
-            cul_de_sac.save()
-
-            # make sure transition's roles are a subset of the roles associated
-            # with the transition's from_state (otherwise you'll have a
-            # transition that none of the participants for a state can make use
-            # of)
-            role = Role.objects.get(id=2)
-            transition = Transition.objects.get(id=10)
-            transition.roles.clear()
-            transition.roles.add(role)
-            try:
-                w.activate()
-            except Exception, instance:
-                self.assertEqual(u'There is a transition that is not available'\
-                        ' to the participants associated with its source state'\
-                        ' (so it can never be used): %s'%(
-                                transition.name),
-                                instance.args[0]
-                                )
-            else:
-                self.fail('Exception expected but not thrown')
-
-            # so all the potential pitfalls have been vaidated. Lets make sure
+            # so all the potential pitfalls have been validated. Lets make sure
             # we *can* approve it as expected.
-            transition.roles.clear()
-            admin_role = Role.objects.get(id=1)
-            staff_role = Role.objects.get(id=3)
-            transition.roles.add(admin_role)
-            transition.roles.add(staff_role)
             w.activate()
             self.assertEqual(Workflow.ACTIVE, w.status)
 

@@ -186,6 +186,99 @@ class Workflow(models.Model):
             null=True
             )
 
+    # To hold error messages created in the validate method
+    errors = {
+                'workflow':[], 
+                'states': {},
+                'transitions':{},
+             }
+
+    def is_valid(self):
+        """
+        Checks that the directed graph doesn't contain any orphaned nodes (is
+        connected), any cul-de-sac nodes (non-end nodes with no exit
+        transition), has compatible roles for transitions and states and
+        contains exactly one start node and at least one end state.
+
+        Any errors are logged in the errors dictionary.
+
+        Returns a boolean
+        """
+        self.errors = {
+                'workflow':[], 
+                'states': {},
+                'transitions':{},
+             }
+        valid = True
+
+        # The graph must have only one start node
+        if self.states.filter(is_start_state=True).count() != 1:
+            self.errors['workflow'].append(__('There must be only one start'\
+                ' state'))
+            valid = False
+
+        # The graph must have at least one end state
+        if self.states.filter(is_end_state=True).count() < 1:
+            self.errors['workflow'].append(__('There must be at least one end'\
+                ' state'))
+            valid = False
+
+        # Check for orphan nodes / cul-de-sac nodes
+        all_states = self.states.all()
+        for state in all_states:
+            if state.transitions_into.all().count() == 0 and state.is_start_state == False:
+                if not state.id in self.errors['states']:
+                    self.errors['states'][state.id] = list()
+                self.errors['states'][state.id].append(__('This state is'\
+                        ' orphaned. There is no way to get to it given the'\
+                        ' current workflow topology.'))
+                valid = False
+
+            if state.transitions_from.all().count() == 0 and state.is_end_state == False:
+                if not state.id in self.errors['states']:
+                    self.errors['states'][state.id] = list()
+                self.errors['states'][state.id].append(__('This state is a'\
+                        ' dead end. It is not marked as an end state and there'\
+                        ' is no way to exit from it.'))
+                valid = False
+
+        # Check the role collections are compatible between states and
+        # transitions (i.e. there cannot be any transitions that are only
+        # available to participants with roles that are not also roles
+        # associated with the parent state).
+        for state in all_states:
+            # *at least* one role from the state must also be associated
+            # with each transition where the state is the from_state 
+            state_roles = state.roles.all()
+            for transition in state.transitions_from.all():
+                if not transition.roles.filter(pk__in=[r.id for r in state_roles]):
+                    if not transition.id in self.errors['transitions']:
+                        self.errors['transitions'][transition.id] = list()
+                    self.errors['transitions'][transition.id].append(__('This'\
+                            ' transition is not navigable because none of the'\
+                            ' roles associated with the parent state have'\
+                            ' permission to use it.'))
+                    valid = False
+        return valid
+
+    def has_errors(self, thing):
+        """
+        Utility method to quickly get a list of errors associated with the
+        "thing" passed to it (either a state or transition)
+        """
+        if isinstance(thing, State):
+            if thing.id in self.errors['states']:
+                return self.errors['states'][thing.id]
+            else:
+                return []
+        elif isinstance(thing, Transition):
+            if thing.id in self.errors['transitions']:
+                return self.errors['transitions'][thing.id]
+            else:
+                return []
+        else:
+            return []
+
     def activate(self):
         """
         Puts the workflow in the "active" state after checking the directed
@@ -197,41 +290,9 @@ class Workflow(models.Model):
         if not self.status == self.DEFINITION:
             raise UnableToActivateWorkflow, __('Only workflows in the'\
                     ' "definition" state may be activated')
-        # The graph must have only one start node
-        if self.states.filter(is_start_state=True).count() != 1:
-            raise UnableToActivateWorkflow, __('There must be only one start'\
-                    ' state')
-        # The graph must have at least one end state
-        if self.states.filter(is_end_state=True).count() < 1:
-            raise UnableToActivateWorkflow, __('There must be at least one end'\
-                    ' state')
-        # Check for orphan nodes / cul-de-sac nodes
-        all_states = self.states.all()
-        for state in all_states:
-            if state.transitions_into.all().count() == 0 and state.is_start_state == False:
-                raise UnableToActivateWorkflow, __('There is an orphaned state'\
-                    ' associated with this workflow (i.e. there is no way to'\
-                    ' get to it from the start state): %s') % state.name
-            if state.transitions_from.all().count() == 0 and state.is_end_state == False:
-                raise UnableToActivateWorkflow, __('There is a state with no'\
-                        ' transitions from it that is not an end state (i.e.'\
-                        ' it is a dead end): %s') % state.name
-        # Check the role collections are compatible between states and
-        # transitions (i.e. there cannot be any transitions that are only
-        # available to participants with roles that are not also roles
-        # associated with the parent state).
-        for state in all_states:
-            # *at least* one role from the state must also be associated
-            # with each transition where the state is the from_state 
-            state_roles = state.roles.all()
-            for transition in state.transitions_from.all():
-                if not transition.roles.filter(pk__in=[r.id for r in state_roles]):
-                    raise UnableToActivateWorkflow, __('There is a transition'\
-                            ' that is not available to the participants'\
-                            ' associated with its source state (so it can'\
-                            ' never be used): %s')%(
-                                    transition.name
-                                    )
+        if not self.is_valid():
+            raise UnableToActivateWorkflow, __("Cannot activate as the"\
+                    " workflow doesn't validate.")
         # Good to go...
         self.status = self.ACTIVE
         self.save()
