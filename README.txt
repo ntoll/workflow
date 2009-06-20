@@ -9,7 +9,8 @@ web-application. This work is an abstraction of / extraction from a workflow
 engine built for an HR application.
 
 Currently only the models have been "extracted". Commented doctests can be 
-found in tests.py.
+found in tests.py. I've also created some templates for generating .dot files
+for processing by Graphviz. See: http://twitpic.com/7xiz7 for example output.
 
 To make things easy I've described each model below and made up a couple of 
 "user stories" to illustrate how stuff fits together (an Applicant Tracking 
