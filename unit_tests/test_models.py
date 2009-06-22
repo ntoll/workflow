@@ -338,6 +338,13 @@ class ModelTestCase(TestCase):
             actual = s.deadline()
             self.assertEquals(expected, actual)
 
+        def test_event_type_unicode(self):
+            """
+            Make sure we get the name of the event type
+            """
+            et = EventType.objects.get(id=1)
+            self.assertEquals(u'Meeting', et.__unicode__())
+
         def test_workflowmanager_current_state(self):
             """
             Check we always get the latest state (or None if the WorkflowManager

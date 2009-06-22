@@ -462,6 +462,7 @@ class State(models.Model):
         return self.name
 
     class Meta:
+        ordering = ['-is_start_state','is_end_state']
         verbose_name = _('State')
         verbose_name_plural = _('States')
 
@@ -514,6 +515,9 @@ class EventType(models.Model):
             _('Description'),
             blank=True
             )
+
+    def __unicode__(self):
+        return self.name
 
 class Event(models.Model):
     """
