@@ -1,10 +1,12 @@
-/* 
-A diagram of the workflow {{ workflow.name }}
+/*
+A definition for a diagram of the workflow: {{ workflow.name }}
 
-Created with graphviz (http://www.graphviz.org) as part of the Django workflow
+Description: 
+{% if workflow.description %}{{workflow.description}}{% else %}None{% endif %}
+
+Created for use with graphviz (http://www.graphviz.org) by the Django workflow
 application (http://github.com/ntoll/workflow/tree/master)
 */
-
 digraph G {
     {% for s in workflow.states.all %}
     {% include "graphviz/state.dot" %}

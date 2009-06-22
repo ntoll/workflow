@@ -11,6 +11,8 @@ engine built for an HR application.
 Currently only the models have been "extracted". Commented doctests can be 
 found in tests.py. I've also created some templates for generating .dot files
 for processing by Graphviz. See: http://twitpic.com/7xiz7 for example output.
+See the urls.py for paths to use to display the .dot file and resulting .png
+image.
 
 To make things easy I've described each model below and made up a couple of 
 "user stories" to illustrate how stuff fits together (an Applicant Tracking 
