@@ -18,7 +18,7 @@ class WorkflowAdmin(admin.ModelAdmin):
             'cloned_from']
     search_fields = ['name', 'description']
     save_on_top = True
-    exclude = ['created_on', 'created_by', 'cloned_from']
+    exclude = ['created_on', 'cloned_from']
     list_filter = ['status']
 
 class StateAdmin(admin.ModelAdmin):
