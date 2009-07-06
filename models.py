@@ -425,7 +425,10 @@ class State(models.Model):
             related_name='states')
     # The roles defined here define *who* has permission to view the item in
     # this state.
-    roles = models.ManyToManyField(Role)
+    roles = models.ManyToManyField(
+            Role, 
+            blank=True
+            )
     # The following two fields allow a specification of expected duration to be
     # associated with a state. The estimation_value field stores the amount of 
     # time, whilst estimation_unit stores the unit of time estimation_value is
@@ -498,7 +501,10 @@ class Transition(models.Model):
             )
     # The roles referenced here define *who* has permission to use this 
     # transition to move between states.
-    roles = models.ManyToManyField(Role)
+    roles = models.ManyToManyField(
+            Role,
+            blank=True
+            )
 
     def __unicode__(self):
         return self.name
