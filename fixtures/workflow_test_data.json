@@ -82,7 +82,8 @@
     "model": "workflow.workflow", 
     "fields": {
       "status": 0, 
-      "name": "test_workflow", 
+      "name": "test workflow", 
+      "slug": "test_workflow",
       "cloned_from": null, 
       "created_by": 1, 
       "created_on": "2009-05-25 06:59:19", 

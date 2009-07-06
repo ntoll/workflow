@@ -30,7 +30,7 @@ class ModelTestCase(TestCase):
             __unicode__()
             """
             w = Workflow.objects.get(id=1)
-            self.assertEquals(u'test_workflow', w.__unicode__())
+            self.assertEquals(u'test workflow', w.__unicode__())
 
         def test_workflow_lifecycle(self):
             """

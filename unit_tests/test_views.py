@@ -55,7 +55,7 @@ class ViewTestCase(TestCase):
             c = Client()
             response = c.get('/test_workflow/dotfile/')
             self.assertContains(response, 'A definition for a diagram of the'\
-                ' workflow: test_workflow')
+                ' workflow: test workflow')
 
         def test_graphviz(self):
             """

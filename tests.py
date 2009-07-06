@@ -32,7 +32,7 @@ EventTypes define what sort of events can happen in a workflow.
 
 Creating a workflow puts it into the "DEFINITION" status. It can't be used yet.
 
->>> wf = Workflow.objects.create(name='Simple Document Approval', description='A simple document approval process', created_by=joe)
+>>> wf = Workflow.objects.create(name='Simple Document Approval', slug='docapp', description='A simple document approval process', created_by=joe)
 
 Adding four states:
 

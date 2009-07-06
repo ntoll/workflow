@@ -34,7 +34,7 @@ def dotfile(request, workflow_slug):
     """
     Returns the dot file for use with graphviz given the workflow name (slug) 
     """
-    w = get_object_or_404(Workflow, name=workflow_slug)
+    w = get_object_or_404(Workflow, slug=workflow_slug)
     response = HttpResponse(mimetype='text/plain')
     response['Content-Disposition'] = 'attachment; filename=%s.dot'%w.name
     response.write(get_dotfile(w))
@@ -54,7 +54,7 @@ def graphviz(request, workflow_slug):
         # At least provide a helpful exception message
         raise Exception("GRAPHVIZ_DOT_COMMAND constant not set in settings.py"\
                 " (to specify the absolute path to graphviz's dot command)")
-    w = get_object_or_404(Workflow, name=workflow_slug)
+    w = get_object_or_404(Workflow, slug=workflow_slug)
     # Lots of "pipe" work to avoid hitting the file-system
     proc = subprocess.Popen('%s -Tpng' % settings.GRAPHVIZ_DOT_COMMAND,
                 shell=True,

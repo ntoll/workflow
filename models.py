@@ -161,8 +161,12 @@ class Workflow(models.Model):
                 (RETIRED, _('Retired')),
             )
 
-    name = models.SlugField(
-            _('Workflow Name')
+    name = models.CharField(
+            _('Workflow Name'),
+            max_length=128
+            )
+    slug = models.SlugField(
+            _('Slug')
             )
     description = models.TextField(
             _('Description'),
@@ -319,6 +323,7 @@ class Workflow(models.Model):
             # Clone this workflow
             clone_workflow = Workflow()
             clone_workflow.name = self.name
+            clone_workflow.slug = self.slug+'_clone'
             clone_workflow.description = self.description
             clone_workflow.status = self.DEFINITION
             clone_workflow.created_by = user
