@@ -11,6 +11,7 @@ import datetime
 # django
 from django.test.client import Client
 from django.test import TestCase
+from django.conf import settings
 
 # project
 from workflow.views import *
@@ -66,3 +67,20 @@ class ViewTestCase(TestCase):
             self.assertEqual(200, response.status_code)
             self.assertEqual('image/png', response['Content-Type'])
 
+        def test_graphviz_with_no_graphviz(self):
+            """
+            Makes sure the graphviz method returns an appropriate exception if
+            graphviz path is not specified
+            """
+            _target = settings._target
+            del _target.GRAPHVIZ_DOT_COMMAND
+            settings.__setattr__('_target', _target)
+            c = Client()
+            try:
+                response = c.get('/test_workflow.png')
+            except Exception, instance:
+                self.assertEqual(u"GRAPHVIZ_DOT_COMMAND constant not set in"\
+                        " settings.py (to specify the absolute path to"\
+                        " graphviz's dot command)", instance.args[0])
+            else:
+                self.fail('Exception expected but not thrown')

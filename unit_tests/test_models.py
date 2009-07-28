@@ -345,17 +345,17 @@ class ModelTestCase(TestCase):
             et = EventType.objects.get(id=1)
             self.assertEquals(u'Meeting', et.__unicode__())
 
-        def test_workflowmanager_current_state(self):
+        def test_workflowactivity_current_state(self):
             """
-            Check we always get the latest state (or None if the WorkflowManager
+            Check we always get the latest state (or None if the WorkflowActivity
             hasn't started navigating a workflow
             """
             w = Workflow.objects.get(id=1)
             u = User.objects.get(id=1)
             r = Role.objects.get(id=1)
-            wm = WorkflowManager(workflow=w, created_by=u)
+            wm = WorkflowActivity(workflow=w, created_by=u)
             wm.save()
-            p = Participant(user=u, role=r, workflowmanager=wm)
+            p = Participant(user=u, role=r, workflowactivity=wm)
             p.save()
             # We've not started the workflow yet so make sure we don't get
             # anything back
@@ -378,7 +378,7 @@ class ModelTestCase(TestCase):
             self.assertEqual(tr, current_state.transition)
             self.assertEqual(p, current_state.participant)
 
-        def test_workflowmanager_start(self):
+        def test_workflowactivity_start(self):
             """
             Make sure the method works in the right way for all possible
             situations
@@ -386,9 +386,9 @@ class ModelTestCase(TestCase):
             w = Workflow.objects.get(id=1)
             u = User.objects.get(id=1)
             r = Role.objects.get(id=1)
-            wm = WorkflowManager(workflow=w, created_by=u)
+            wm = WorkflowActivity(workflow=w, created_by=u)
             wm.save()
-            p = Participant(user=u, role=r, workflowmanager=wm)
+            p = Participant(user=u, role=r, workflowactivity=wm)
             p.save()
             # Lets make sure we can't start a workflow that has been stopped
             wm.force_stop(p, 'foo')
@@ -398,9 +398,9 @@ class ModelTestCase(TestCase):
                 self.assertEqual(u'Already completed', instance.args[0])
             else:
                 self.fail('Exception expected but not thrown')
-            wm = WorkflowManager(workflow=w, created_by=u)
+            wm = WorkflowActivity(workflow=w, created_by=u)
             wm.save()
-            # Lets make sure we can't start a workflow manager if there isn't
+            # Lets make sure we can't start a workflow activity if there isn't
             # a single start state
             s2 = State.objects.get(id=2)
             s2.is_start_state=True
@@ -424,7 +424,7 @@ class ModelTestCase(TestCase):
             self.assertNotEqual(None, current_state)
             self.assertEqual(s1, current_state.state)
             self.assertEqual(p, current_state.participant)
-            # Lets make sure we can't "start" the workflowmanager again
+            # Lets make sure we can't "start" the workflowactivity again
             try:
                 wm.start(p)
             except Exception, instance:
@@ -432,7 +432,7 @@ class ModelTestCase(TestCase):
             else:
                 self.fail('Exception expected but not thrown')
 
-        def test_workflowmanager_progress(self):
+        def test_workflowactivity_progress(self):
             """
             Make sure the transition from state to state is validated and
             recorded in the correct way.
@@ -441,9 +441,9 @@ class ModelTestCase(TestCase):
             w = Workflow.objects.get(id=1)
             u = User.objects.get(id=1)
             r = Role.objects.get(id=1)
-            wm = WorkflowManager(workflow=w, created_by=u)
+            wm = WorkflowActivity(workflow=w, created_by=u)
             wm.save()
-            p = Participant(user=u, role=r, workflowmanager=wm)
+            p = Participant(user=u, role=r, workflowactivity=wm)
             p.save()
             wm.start(p)
             # Validation checks:
@@ -482,7 +482,7 @@ class ModelTestCase(TestCase):
             self.assertEqual('A Test', wm.current_state().note)
             # 3. The participant has the correct role to make the transition
             r2 = Role.objects.get(id=2)
-            p2 = Participant(user=u, role=r2, workflowmanager=wm)
+            p2 = Participant(user=u, role=r2, workflowactivity=wm)
             tr4 = Transition.objects.get(id=4) # won't work with p2/r2
             try:
                 wm.progress(tr4, p2)
@@ -501,16 +501,19 @@ class ModelTestCase(TestCase):
             self.assertEqual(tr4.name, wh.note)
             self.assertNotEqual(None, wh.deadline)
             # Get to the end of the workflow and check that by progressing to an
-            # end state the workflow manager is given a completed on timestamp
+            # end state the workflow activity is given a completed on timestamp
             tr8 = Transition.objects.get(id=8)
             tr10 = Transition.objects.get(id=10)
             tr11 = Transition.objects.get(id=11)
             wm.progress(tr8, p)
+            # Lets log a generic event
+            e2 = Event.objects.get(id=4)
+            wm.log_event(e2, p, "A generic event has taken place")
             wm.progress(tr10, p)
             wm.progress(tr11, p)
             self.assertNotEqual(None, wm.completed_on)
 
-        def test_workflowmanager_log_event(self):
+        def test_workflowactivity_log_event(self):
             """
             Make sure the logging of events for a workflow is validated and
             recorded in the correct way.
@@ -519,9 +522,9 @@ class ModelTestCase(TestCase):
             w = Workflow.objects.get(id=1)
             u = User.objects.get(id=1)
             r = Role.objects.get(id=1)
-            wm = WorkflowManager(workflow=w, created_by=u)
+            wm = WorkflowActivity(workflow=w, created_by=u)
             wm.save()
-            p = Participant(user=u, role=r, workflowmanager=wm)
+            p = Participant(user=u, role=r, workflowactivity=wm)
             p.save()
             wm.start(p)
             # Validation checks:
@@ -541,7 +544,7 @@ class ModelTestCase(TestCase):
                 wm.log_event(dummy_event, p)
             except Exception, instance:
                 self.assertEqual(u'The event is not associated with the'\
-                        ' workflow for the WorkflowManager', instance.args[0])
+                        ' workflow for the WorkflowActivity', instance.args[0])
             else:
                 self.fail('Exception expected but not thrown')
             # 2. Make sure the participant has the correct role to log the event
@@ -551,7 +554,7 @@ class ModelTestCase(TestCase):
             wm.progress(tr1, p)
             e1 = Event.objects.get(id=1)
             r3 = Role.objects.get(id=3)
-            p2 = Participant(user=u, role=r3, workflowmanager=wm)
+            p2 = Participant(user=u, role=r3, workflowactivity=wm)
             try:
                 wm.log_event(e1, p2)
             except Exception, instance:
@@ -590,26 +593,34 @@ class ModelTestCase(TestCase):
             self.assertEqual(e2, wh.event)
             self.assertEqual(p, wh.participant)
             self.assertEqual('A Test', wh.note)
+            # Finally, make sure we can log a generic event (not associated with
+            # a particular workflow, state or set of roles)
+            e3 = Event.objects.get(id=4)
+            wh = wm.log_event(e3, p, 'Another test')
+            self.assertEqual(s3, wh.state)
+            self.assertEqual(e3, wh.event)
+            self.assertEqual(p, wh.participant)
+            self.assertEqual('Another test', wh.note)
 
-        def test_workflowmanager_force_stop(self):
+        def test_workflowactivity_force_stop(self):
             """
-            Make sure a WorkflowManager is stopped correctly with this method
+            Make sure a WorkflowActivity is stopped correctly with this method
             """
             # Make sure we can appropriately force_stop an un-started workflow
-            # manager
+            # activity
             w = Workflow.objects.get(id=1)
             u = User.objects.get(id=1)
             r = Role.objects.get(id=1)
-            wm = WorkflowManager(workflow=w, created_by=u)
+            wm = WorkflowActivity(workflow=w, created_by=u)
             wm.save()
-            p = Participant(user=u, role=r, workflowmanager=wm)
+            p = Participant(user=u, role=r, workflowactivity=wm)
             p.save()
             wm.force_stop(p, 'foo')
             self.assertNotEqual(None, wm.completed_on)
             self.assertEqual(None, wm.current_state())
             # Lets make sure we can force_stop an already started workflow
-            # manager
-            wm = WorkflowManager(workflow=w, created_by=u)
+            # activity
+            wm = WorkflowActivity(workflow=w, created_by=u)
             wm.save()
             wm.start(p)
             wm.force_stop(p, 'foo')
@@ -628,9 +639,9 @@ class ModelTestCase(TestCase):
             w = Workflow.objects.get(id=1)
             u = User.objects.get(id=1)
             r = Role.objects.get(id=1)
-            wm = WorkflowManager(workflow=w, created_by=u)
+            wm = WorkflowActivity(workflow=w, created_by=u)
             wm.save()
-            p = Participant(user=u, role=r, workflowmanager=wm)
+            p = Participant(user=u, role=r, workflowactivity=wm)
             p.save()
             self.assertEquals(u'test_admin (Administrator)', p.__unicode__())
             p.disabled = True

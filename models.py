@@ -58,18 +58,18 @@ class UnableToCloneWorkflow(Exception):
 
 class UnableToStartWorkflow(Exception):
     """
-    To be raised if a WorkflowManager is unable to start a workflow
+    To be raised if a WorkflowActivity is unable to start a workflow
     """
 
 class UnableToProgressWorkflow(Exception):
     """
-    To be raised if the WorkflowManager is unable to progress a workflow with a
+    To be raised if the WorkflowActivity is unable to progress a workflow with a
     particular transition.
     """
 
 class UnableToLogWorkflowEvent(Exception):
     """
-    To be raised if the WorkflowManager is unable to log an event in the
+    To be raised if the WorkflowActivity is unable to log an event in the
     WorkflowHistory
     """
 
@@ -78,26 +78,26 @@ class UnableToLogWorkflowEvent(Exception):
 #########
 
 # Fired when a role is assigned to a user for a particular run of a workflow
-# (defined in the workflow_manager). The sender is an instance of the
+# (defined in the WorkflowActivity). The sender is an instance of the
 # Participant model.
 role_assigned = django.dispatch.Signal()
-# Fired when a new workflow_manager starts navigating a workflow. The sender is
-# an instance of the WorkflowManager model
+# Fired when a new WorkflowActivity starts navigating a workflow. The sender is
+# an instance of the WorkflowActivity model
 workflow_started = django.dispatch.Signal()
-# Fired just before a WorkflowManager creates a new item in the Workflow History
+# Fired just before a WorkflowActivity creates a new item in the Workflow History
 # (the sender is an instance of the WorkflowHistory model)
 workflow_pre_change = django.dispatch.Signal()
-# Fired after a WorkflowManager creates a new item in the Workflow History (the
+# Fired after a WorkflowActivity creates a new item in the Workflow History (the
 # sender is an instance of the WorkflowHistory model)
 workflow_post_change = django.dispatch.Signal() 
-# Fired when a WorkflowManager causes a transition to a new state (the sender is
+# Fired when a WorkflowActivity causes a transition to a new state (the sender is
 # an instance of the WorkflowHistory model)
 workflow_transitioned = django.dispatch.Signal()
-# Fired when some event happens during the life of a workflow_manager (the 
+# Fired when some event happens during the life of a WorkflowActivity (the 
 # sender is an instance of the WorkflowHistory model)
 workflow_event_completed = django.dispatch.Signal()
-# Fired when an active workflow_manager reaches a workflow's end state. The
-# sender is an instance of the WorkflowManager model
+# Fired when an active WorkflowActivity reaches a workflow's end state. The
+# sender is an instance of the WorkflowActivity model
 workflow_ended = django.dispatch.Signal()
 
 ########
@@ -304,7 +304,7 @@ class Workflow(models.Model):
     def retire(self):
         """
         Retires the workflow so it can no-longer be used with new
-        WorkflowManager models
+        WorkflowActivity models
         """
         self.status = self.RETIRED
         self.save()
@@ -516,7 +516,7 @@ class Transition(models.Model):
 class EventType(models.Model):
     """
     Defines the types of event that can be associated with a workflow. Examples
-    might include: meeting, deadline, review, assessment etc...
+    might include: comment, meeting, deadline, review, assessment etc...
     """
     name = models.CharField(
             _('Event Type Name'),
@@ -544,14 +544,18 @@ class Event(models.Model):
             blank=True
             )
     # The workflow field is the result of denormalization to help with the
-    # Workflow class's clone() method
+    # Workflow class's clone() method.
+    # Also, workflow and state can be nullable so an event can be treated as
+    # "generic" for all workflows / states in the database.
     workflow = models.ForeignKey(
             Workflow,
-            related_name='events'
+            related_name='events',
+            null=True
             )
     state = models.ForeignKey(
             State,
-            related_name='events'
+            related_name='events',
+            null=True
             )
     # The roles referenced here indicate *who* is supposed to be a part of the
     # event
@@ -576,12 +580,12 @@ class Event(models.Model):
         verbose_name = _('Event')
         verbose_name_plural = _('Events')
 
-class WorkflowManager(models.Model):
+class WorkflowActivity(models.Model):
     """
     Other models in a project reference this model so they become associated 
     with a particular workflow.
 
-    The WorkflowManager object also contains *all* the methods required to
+    The WorkflowActivity object also contains *all* the methods required to
     start, progress and stop a workflow.
     """
     workflow = models.ForeignKey(Workflow)
@@ -595,7 +599,7 @@ class WorkflowManager(models.Model):
     def current_state(self):
         """ 
         Returns the instance of the WorkflowHistory model that represents the 
-        current state this WorkflowManager is in.
+        current state this WorkflowActivity is in.
         """
         if self.history.all():
             return self.history.all()[0]
@@ -604,19 +608,20 @@ class WorkflowManager(models.Model):
 
     def start(self, participant):
         """
-        Starts a WorkflowManager by putting it into the start state of the
+        Starts a WorkflowActivity by putting it into the start state of the
         workflow defined in the "workflow" field after validating the workflow
-        manager is in a state appropriate for "starting"
+        activity is in a state appropriate for "starting"
         """
         start_state_result = State.objects.filter(
                 workflow=self.workflow, 
                 is_start_state=True
                 )
         # Validation...
-        # 1. The workflow manager isn't already started
+        # 1. The workflow activity isn't already started
         if self.current_state():
             raise UnableToStartWorkflow, __('Already started')
-        # 2. The workflow manager hasn't been force_stopped before being started
+        # 2. The workflow activity hasn't been force_stopped before being 
+        # started
         if self.completed_on:
             raise UnableToStartWorkflow, __('Already completed')
         # 3. There is exactly one start state
@@ -624,7 +629,7 @@ class WorkflowManager(models.Model):
             raise UnableToStartWorkflow, __('Cannot find single start state')
         # Good to go...
         first_step = WorkflowHistory(
-                workflowmanager=self,
+                workflowactivity=self,
                 state=start_state_result[0],
                 participant=participant,
                 note=__('Started workflow'),
@@ -635,8 +640,8 @@ class WorkflowManager(models.Model):
 
     def progress(self, transition, participant, note=''):
         """
-        Attempts to progress a workflow manager with the specified transition as
-        requested by the specified participant.
+        Attempts to progress a workflow activity with the specified transition 
+        as requested by the specified participant.
 
         The transition is validated (to make sure it is a legal "move" in the
         directed graph) and the method returns the new WorkflowHistory state or
@@ -652,7 +657,7 @@ class WorkflowManager(models.Model):
         # the WorkflowHistory
         mandatory_events = current_state.state.events.filter(is_mandatory=True)
         for me in mandatory_events:
-            if not me.history.filter(workflowmanager=self):
+            if not me.history.filter(workflowactivity=self):
                 raise UnableToProgressWorkflow, __('Transition not valid'\
                     ' (mandatory event missing)')
         # 3. Make sure the user has the appropriate role to allow them to make
@@ -662,11 +667,11 @@ class WorkflowManager(models.Model):
                     ' authority to use the specified transition')
         # The "progress" request has been validated to store the transition into
         # the appropriate WorkflowHistory record and if it is an end state then
-        # update this WorkflowManager's record with the appropriate timestamp
+        # update this WorkflowActivity's record with the appropriate timestamp
         if not note:
             note = transition.name
         wh = WorkflowHistory(
-                workflowmanager=self,
+                workflowactivity=self,
                 state=transition.to_state,
                 transition=transition,
                 participant=participant,
@@ -674,7 +679,7 @@ class WorkflowManager(models.Model):
                 deadline=transition.to_state.deadline()
                 )
         wh.save()
-        # If we're at the end then mark the workflow manager as completed on
+        # If we're at the end then mark the workflow activity as completed on
         # today
         if transition.to_state.is_end_state:
             self.completed_on = datetime.datetime.today()
@@ -684,33 +689,38 @@ class WorkflowManager(models.Model):
     def log_event(self, event, participant, note=''):
         """
         Logs the occurance of an event in the WorkflowHistory of a 
-        WorkflowManager and returns the resulting record.
+        WorkflowActivity and returns the resulting record.
 
-        Validates that the event is associated with the workflow, that the
+        If the event is associated with a workflow or state then this method
+        validates that the event is associated with the workflow, that the
         participant logging the event is also one of the event participants and
         if the event is mandatory then it must be done whilst in the
         appropriate state.
         """
         current_state = self.current_state()
-        # 1. Make sure we have an event for the right workflow
-        if not event.workflow == self.workflow:
-            raise UnableToLogWorkflowEvent, __('The event is not associated'\
-                    ' with the workflow for the WorkflowManager')
-        # 2. Make sure the participant is associated with the event
-        if not event.roles.filter(pk__in=[participant.role.id]):
-            raise UnableToLogWorkflowEvent, __('The participant is not'\
-                    ' associated with the specified event')
-        # 3. If the event is mandatory then it must be completed whilst in the
-        # associated state
-        if event.is_mandatory:
-            if not event.state == current_state.state:
-                raise UnableToLogWorkflowEvent, __('The mandatory event is'\
-                        ' not associated with the current state')
+        if event.workflow:
+            # Make sure we have an event for the right workflow
+            if not event.workflow == self.workflow:
+                raise UnableToLogWorkflowEvent, __('The event is not associated'\
+                        ' with the workflow for the WorkflowActivity')
+            if event.state:
+                # If the event is mandatory then it must be completed whilst in
+                # the associated state
+                if event.is_mandatory:
+                    if not event.state == current_state.state:
+                        raise UnableToLogWorkflowEvent, __('The mandatory'\
+                                ' event is not associated with the current'\
+                                ' state')
+        if event.roles.all():
+            # Make sure the participant is associated with the event
+            if not event.roles.filter(pk__in=[participant.role.id]):
+                raise UnableToLogWorkflowEvent, __('The participant is not'\
+                        ' associated with the specified event')
         if not note:
             note=event.name
         # Good to go...
         wh = WorkflowHistory(
-                workflowmanager=self,
+                workflowactivity=self,
                 state=current_state.state,
                 event=event,
                 participant=participant,
@@ -722,15 +732,15 @@ class WorkflowManager(models.Model):
 
     def force_stop(self, participant, reason):
         """
-        Should a WorkflowManager need to be abandoned this method cleanly logs
-        the event and puts the WorkflowManager in the appropriate state (with
+        Should a WorkflowActivity need to be abandoned this method cleanly logs
+        the event and puts the WorkflowActivity in the appropriate state (with
         reason provided by participant).
         """
         # Lets try to create an appropriate entry in the WorkflowHistory table
         current_state = self.current_state()
         if current_state:
             final_step = WorkflowHistory(
-                workflowmanager=self,
+                workflowactivity=self,
                 state=current_state.state,
                 participant=participant,
                 note=__('Workflow forced to stop! Reason given: %s') % reason,
@@ -743,8 +753,8 @@ class WorkflowManager(models.Model):
 
     class Meta:
         ordering = ['-completed_on', '-created_on']
-        verbose_name = _('Workflow Manager')
-        verbose_name_plural = _('Workflow Managers')
+        verbose_name = _('Workflow Activity')
+        verbose_name_plural = _('Workflow Activites')
         permissions = (
                 ('can_start_workflow','Can start a workflow'),
             )
@@ -754,9 +764,13 @@ class Participant(models.Model):
     Defines which users have what roles in a particular run of a workflow
     """
     user = models.ForeignKey(User)
-    role = models.ForeignKey(Role)
-    workflowmanager = models.ForeignKey(
-            WorkflowManager,
+    # can be nullable because a participant *might* not have a role assigned to
+    # them (yet)
+    role = models.ForeignKey(
+            Role,
+            null=True)
+    workflowactivity= models.ForeignKey(
+            WorkflowActivity,
             related_name='participants'
             )
     disabled = models.BooleanField(default=False)
@@ -774,18 +788,18 @@ class Participant(models.Model):
         return u"%s (%s)"%(username, name)
 
     class Meta:
-        ordering = ['workflowmanager', 'role']
+        ordering = ['workflowactivity', 'role']
         verbose_name = _('Participant')
         verbose_name_plural = _('Participants')
 
 class WorkflowHistory(models.Model):
     """
     Records what has happened and when in a particular run of a workflow. The
-    latest record for the referenced WorkflowManager will indicate the current 
+    latest record for the referenced WorkflowActivity will indicate the current 
     state.
     """
-    workflowmanager = models.ForeignKey(
-            WorkflowManager,
+    workflowactivity= models.ForeignKey(
+            WorkflowActivity,
             related_name='history')
     state = models.ForeignKey(
             State,
@@ -831,9 +845,9 @@ class WorkflowHistory(models.Model):
         if self.event:
             workflow_event_completed.send(sender=self)
         if self.state.is_start_state:
-            workflow_started.send(sender=self.workflowmanager)
+            workflow_started.send(sender=self.workflowactivity)
         elif self.state.is_end_state:
-            workflow_ended.send(sender=self.workflowmanager)
+            workflow_ended.send(sender=self.workflowactivity)
 
     def __unicode__(self):
         return u"%s by %s"%(self.note, self.participant.__unicode__())

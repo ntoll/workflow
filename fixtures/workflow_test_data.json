@@ -492,5 +492,20 @@
       ], 
       "description": "A party for getting to the end of the workflow"
     }
+  },
+  {
+    "pk": 4, 
+    "model": "workflow.event", 
+    "fields": {
+      "is_mandatory": false, 
+      "name": "Team meeting", 
+      "roles": [], 
+      "workflow": null, 
+      "state": null, 
+      "event_types": [
+        1 
+      ], 
+      "description": "Impromptu team meeting"
+    }
   }
 ]
