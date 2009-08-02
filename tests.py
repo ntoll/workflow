@@ -96,24 +96,26 @@ we can interact with the workflow we defined above.
 >>> wa = WorkflowActivity(workflow=wf, created_by=fred)
 >>> wa.save()
 >>> p1 = Participant()
->>> p1 = Participant(user=fred, role=author, workflowactivity=wa)
+>>> p1 = Participant(user=fred, workflowactivity=wa)
 >>> p1.save()
->>> p2 = Participant(user=joe, role=boss, workflowactivity=wa)
+>>> p1.roles.add(author)
+>>> p2 = Participant(user=joe, workflowactivity=wa)
 >>> p2.save()
+>>> p2.roles.add(boss)
 >>> d = Document(title='Had..?', body="Bob, where Alice had had 'had', had had 'had had'; 'had had' had had the examiner's approval", workflow_activity=wa)
 
 Starting the workflow via the workflow activity is easy... notice we have to pass
 the participant and that the method returns the current state.
 
 >>> d.workflow_activity.start(p1)
-<WorkflowHistory: Started workflow by fred (author)>
+<WorkflowHistory: Started workflow created by fred - author>
 
 The WorkflowActivity's current_state() method does exactly what it says. You can
 find out lots of interesting things...
 
 >>> current = d.workflow_activity.current_state()
 >>> current.participant
-<Participant: fred (author)>
+<Participant: fred - author>
 >>> current.note
 u'Started workflow'
 >>> current.state
@@ -127,8 +129,8 @@ and submits it for approval)
 >>> my_transition = current.state.transitions_from.all()[0]
 >>> my_transition
 <Transition: Request Approval>
->>> d.workflow_activity.progress(my_transition, p1)
-<WorkflowHistory: Request Approval by fred (author)>
+>>> d.workflow_activity.progress(my_transition, fred)
+<WorkflowHistory: Request Approval created by fred - author>
 
 Notice the WorkflowActivity's progress method returns the new state. What is 
 current_state() telling us..?
@@ -149,8 +151,8 @@ So we have an event associated with this event. Lets pretend it's happened.
 Notice that I can pass a bespoke "note" to store against the event.
 
 >>> my_event = current.state.events.all()[0]
->>> d.workflow_activity.log_event(my_event, p2, "A great review meeting, loved the punchline!")
-<WorkflowHistory: A great review meeting, loved the punchline! by joe (boss)>
+>>> d.workflow_activity.log_event(my_event, joe, "A great review meeting, loved the punchline!")
+<WorkflowHistory: A great review meeting, loved the punchline! created by joe - boss>
 >>> current = d.workflow_activity.current_state()
 >>> current.state
 <State: Under Review>
@@ -165,14 +167,14 @@ bespoke "note" to the progress method.
 >>> current.state.transitions_from.all().order_by('id')
 [<Transition: Revise Draft>, <Transition: Publish>]
 >>> my_transition = current.state.transitions_from.all().order_by('id')[1]
->>> d.workflow_activity.progress(my_transition, p2, "We'll be up for a Pulitzer")
-<WorkflowHistory: We'll be up for a Pulitzer by joe (boss)>
+>>> d.workflow_activity.progress(my_transition, joe, "We'll be up for a Pulitzer")
+<WorkflowHistory: We'll be up for a Pulitzer created by joe - boss>
 
 We can also log events that have not been associated with specific workflows,
 states or roles...
 
->>> d.workflow_activity.log_event(team_meeting, p2)
-<WorkflowHistory: Team Meeting by joe (boss)>
+>>> d.workflow_activity.log_event(team_meeting, joe)
+<WorkflowHistory: Team Meeting created by joe - boss>
 >>> current = d.workflow_activity.current_state()
 >>> current.event
 <Event: Team Meeting>
@@ -183,8 +185,8 @@ Lets finish the workflow just to demonstrate what useful stuff is logged:
 >>> current.state.transitions_from.all().order_by('id')
 [<Transition: Archive>]
 >>> my_transition = current.state.transitions_from.all().order_by('id')[0]
->>> d.workflow_activity.progress(my_transition, p2)
-<WorkflowHistory: Archive by joe (boss)>
+>>> d.workflow_activity.progress(my_transition, joe)
+<WorkflowHistory: Archive created by joe - boss>
 >>> for item in d.workflow_activity.history.all():
 ...     print '%s by %s'%(item.note, item.participant.user.username)
 ... 

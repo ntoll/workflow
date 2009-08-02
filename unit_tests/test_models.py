@@ -338,6 +338,35 @@ class ModelTestCase(TestCase):
             actual = s.deadline()
             self.assertEquals(expected, actual)
 
+        def test_state_unicode(self):
+            """
+            Makes sure we get the right result from the __unicode__() method in
+            the State model
+            """
+            w = Workflow.objects.get(id=1)
+            s = State(
+                    name='test',
+                    workflow=w
+                    )
+            s.save()
+            self.assertEqual(u'test', s.__unicode__())
+
+        def test_transition_unicode(self):
+            """
+            Makes sure we get the right result from the __unicode__() method in
+            the Transition model
+            """
+            tr = Transition.objects.get(id=1)
+            self.assertEqual(u'Proceed to state 2', tr.__unicode__())
+
+        def test_event_unicode(self):
+            """
+            Makes sure we get the right result from the __unicode__() method in
+            the Event model
+            """
+            e = Event.objects.get(id=1)
+            self.assertEqual(u'Important meeting', e.__unicode__())
+
         def test_event_type_unicode(self):
             """
             Make sure we get the name of the event type
@@ -353,17 +382,18 @@ class ModelTestCase(TestCase):
             w = Workflow.objects.get(id=1)
             u = User.objects.get(id=1)
             r = Role.objects.get(id=1)
-            wm = WorkflowActivity(workflow=w, created_by=u)
-            wm.save()
-            p = Participant(user=u, role=r, workflowactivity=wm)
+            wa = WorkflowActivity(workflow=w, created_by=u)
+            wa.save()
+            p = Participant(user=u, workflowactivity=wa)
             p.save()
+            p.roles.add(r)
             # We've not started the workflow yet so make sure we don't get
             # anything back
-            self.assertEqual(None, wm.current_state())
-            wm.start(p)
+            self.assertEqual(None, wa.current_state())
+            wa.start(p)
             # We should be in the first state
             s1 = State.objects.get(id=1) # From the fixtures
-            current_state = wm.current_state()
+            current_state = wa.current_state()
             # check we have a good current state
             self.assertNotEqual(None, current_state)
             self.assertEqual(s1, current_state.state)
@@ -371,9 +401,9 @@ class ModelTestCase(TestCase):
             # Lets progress the workflow and make sure the *latest* state is the
             # current state
             tr = Transition.objects.get(id=1)
-            wm.progress(tr, p)
+            wa.progress(tr, u)
             s2 = State.objects.get(id=2)
-            current_state = wm.current_state()
+            current_state = wa.current_state()
             self.assertEqual(s2, current_state.state)
             self.assertEqual(tr, current_state.transition)
             self.assertEqual(p, current_state.participant)
@@ -386,27 +416,28 @@ class ModelTestCase(TestCase):
             w = Workflow.objects.get(id=1)
             u = User.objects.get(id=1)
             r = Role.objects.get(id=1)
-            wm = WorkflowActivity(workflow=w, created_by=u)
-            wm.save()
-            p = Participant(user=u, role=r, workflowactivity=wm)
+            wa = WorkflowActivity(workflow=w, created_by=u)
+            wa.save()
+            p = Participant(user=u, workflowactivity=wa)
             p.save()
+            p.roles.add(r)
             # Lets make sure we can't start a workflow that has been stopped
-            wm.force_stop(p, 'foo')
+            wa.force_stop(p, 'foo')
             try:
-                wm.start(p)
+                wa.start(p)
             except Exception, instance:
                 self.assertEqual(u'Already completed', instance.args[0])
             else:
                 self.fail('Exception expected but not thrown')
-            wm = WorkflowActivity(workflow=w, created_by=u)
-            wm.save()
+            wa = WorkflowActivity(workflow=w, created_by=u)
+            wa.save()
             # Lets make sure we can't start a workflow activity if there isn't
             # a single start state
             s2 = State.objects.get(id=2)
             s2.is_start_state=True
             s2.save()
             try:
-                wm.start(p)
+                wa.start(p)
             except Exception, instance:
                 self.assertEqual(u'Cannot find single start state', 
                         instance.args[0])
@@ -416,17 +447,17 @@ class ModelTestCase(TestCase):
             s2.save()
             # Lets make sure we *can* start it now we only have a single start
             # state
-            wm.start(p)
+            wa.start(p)
             # We should be in the first state
             s1 = State.objects.get(id=1) # From the fixtures
-            current_state = wm.current_state()
+            current_state = wa.current_state()
             # check we have a good current state
             self.assertNotEqual(None, current_state)
             self.assertEqual(s1, current_state.state)
             self.assertEqual(p, current_state.participant)
             # Lets make sure we can't "start" the workflowactivity again
             try:
-                wm.start(p)
+                wa.start(p)
             except Exception, instance:
                 self.assertEqual(u'Already started', instance.args[0])
             else:
@@ -441,16 +472,26 @@ class ModelTestCase(TestCase):
             w = Workflow.objects.get(id=1)
             u = User.objects.get(id=1)
             r = Role.objects.get(id=1)
-            wm = WorkflowActivity(workflow=w, created_by=u)
-            wm.save()
-            p = Participant(user=u, role=r, workflowactivity=wm)
+            wa = WorkflowActivity(workflow=w, created_by=u)
+            wa.save()
+            self.assertEqual(None, wa.completed_on)
+            p = Participant(user=u, workflowactivity=wa)
             p.save()
-            wm.start(p)
+            p.roles.add(r)
             # Validation checks:
-            # 1. The transition's from_state *must* be the current state
+            # 1. The workflow activity must be started
             tr5 = Transition.objects.get(id=5)
             try:
-                wm.progress(tr5, p)
+                wa.progress(tr5, u)
+            except Exception, instance:
+                self.assertEqual(u'Start the workflow before attempting to'\
+                        ' transition', instance.args[0])
+            else:
+                self.fail('Exception expected but not thrown')
+            wa.start(p)
+            # 2. The transition's from_state *must* be the current state
+            try:
+                wa.progress(tr5, u)
             except Exception, instance:
                 self.assertEqual(u'Transition not valid (wrong parent)', 
                         instance.args[0])
@@ -459,14 +500,14 @@ class ModelTestCase(TestCase):
             # Lets test again with a valid transition with the correct
             # from_state
             tr1 = Transition.objects.get(id=1)
-            wm.progress(tr1, p)
+            wa.progress(tr1, u)
             s2 = State.objects.get(id=2)
-            self.assertEqual(s2, wm.current_state().state)
-            # 2. All mandatory events for the state are in the worklow history
+            self.assertEqual(s2, wa.current_state().state)
+            # 3. All mandatory events for the state are in the worklow history
             # (s2) has a single mandatory event associated with it
             tr2 = Transition.objects.get(id=2)
             try:
-                wm.progress(tr2, p)
+                wa.progress(tr2, u)
             except Exception, instance:
                 self.assertEqual(u'Transition not valid (mandatory event'\
                         ' missing)', instance.args[0])
@@ -474,18 +515,19 @@ class ModelTestCase(TestCase):
                 self.fail('Exception expected but not thrown')
             # Lets log the event and make sure we *can* progress
             e = Event.objects.get(id=1)
-            wm.log_event(e, p)
+            wa.log_event(e, u)
             # Lets progress with a custom note
-            wm.progress(tr2, p, 'A Test')
+            wa.progress(tr2, u, 'A Test')
             s3 = State.objects.get(id=3)
-            self.assertEqual(s3, wm.current_state().state)
-            self.assertEqual('A Test', wm.current_state().note)
-            # 3. The participant has the correct role to make the transition
+            self.assertEqual(s3, wa.current_state().state)
+            self.assertEqual('A Test', wa.current_state().note)
+            # 4. The participant has the correct role to make the transition
             r2 = Role.objects.get(id=2)
-            p2 = Participant(user=u, role=r2, workflowactivity=wm)
-            tr4 = Transition.objects.get(id=4) # won't work with p2/r2
+            p.roles.clear()
+            p.roles.add(r2)
+            tr4 = Transition.objects.get(id=4) # won't work with r2
             try:
-                wm.progress(tr4, p2)
+                wa.progress(tr4, u)
             except Exception, instance:
                 self.assertEqual(u'Participant has insufficient authority to'\
                         ' use the specified transition', instance.args[0])
@@ -493,25 +535,27 @@ class ModelTestCase(TestCase):
                 self.fail('Exception expected but not thrown')
             # We have the good transition so make sure everything is logged in
             # the workflow history properly
+            p.roles.add(r)
             s5 = State.objects.get(id=5)
-            wh = wm.progress(tr4, p)
+            wh = wa.progress(tr4, u)
             self.assertEqual(s5, wh.state)
             self.assertEqual(tr4, wh.transition)
             self.assertEqual(p, wh.participant)
             self.assertEqual(tr4.name, wh.note)
             self.assertNotEqual(None, wh.deadline)
+            self.assertEqual(WorkflowHistory.TRANSITION, wh.log_type)
             # Get to the end of the workflow and check that by progressing to an
             # end state the workflow activity is given a completed on timestamp
             tr8 = Transition.objects.get(id=8)
             tr10 = Transition.objects.get(id=10)
             tr11 = Transition.objects.get(id=11)
-            wm.progress(tr8, p)
+            wa.progress(tr8, u)
             # Lets log a generic event
             e2 = Event.objects.get(id=4)
-            wm.log_event(e2, p, "A generic event has taken place")
-            wm.progress(tr10, p)
-            wm.progress(tr11, p)
-            self.assertNotEqual(None, wm.completed_on)
+            wa.log_event(e2, u, "A generic event has taken place")
+            wa.progress(tr10, u)
+            wa.progress(tr11, u)
+            self.assertNotEqual(None, wa.completed_on)
 
         def test_workflowactivity_log_event(self):
             """
@@ -522,11 +566,21 @@ class ModelTestCase(TestCase):
             w = Workflow.objects.get(id=1)
             u = User.objects.get(id=1)
             r = Role.objects.get(id=1)
-            wm = WorkflowActivity(workflow=w, created_by=u)
-            wm.save()
-            p = Participant(user=u, role=r, workflowactivity=wm)
+            wa = WorkflowActivity(workflow=w, created_by=u)
+            wa.save()
+            p = Participant(user=u, workflowactivity=wa)
             p.save()
-            wm.start(p)
+            p.roles.add(r)
+            # Lets make sure we can log a generic event prior to starting the
+            # workflow activity
+            ge = Event.objects.get(id=4)
+            wh = wa.log_event(ge, u, 'Another test')
+            self.assertEqual(None, wh.state)
+            self.assertEqual(ge, wh.event)
+            self.assertEqual(p, wh.participant)
+            self.assertEqual('Another test', wh.note)
+            self.assertEqual(None, wh.deadline)
+            wa.start(p)
             # Validation checks:
             # 1. Make sure the event we're logging is for the appropriate
             # workflow
@@ -541,7 +595,7 @@ class ModelTestCase(TestCase):
                     )
             dummy_event.save()
             try:
-                wm.log_event(dummy_event, p)
+                wa.log_event(dummy_event, u)
             except Exception, instance:
                 self.assertEqual(u'The event is not associated with the'\
                         ' workflow for the WorkflowActivity', instance.args[0])
@@ -551,26 +605,26 @@ class ModelTestCase(TestCase):
             # (Transition to second state where we have an appropriate event
             # already specified)
             tr1 = Transition.objects.get(id=1)
-            wm.progress(tr1, p)
+            wa.progress(tr1, u)
             e1 = Event.objects.get(id=1)
-            r3 = Role.objects.get(id=3)
-            p2 = Participant(user=u, role=r3, workflowactivity=wm)
+            p.roles.clear()
             try:
-                wm.log_event(e1, p2)
+                wa.log_event(e1, u)
             except Exception, instance:
                 self.assertEqual(u'The participant is not associated with the'\
                         ' specified event', instance.args[0])
             else:
                 self.fail('Exception expected but not thrown')
+            p.roles.add(r)
             # Try again but with the right profile
-            wm.log_event(e1, p)
+            wa.log_event(e1, u)
             # 3. Make sure, if the event is mandatory it can only be logged
             # whilst in the correct state
             e2 = Event.objects.get(id=2)
             e2.is_mandatory = True
             e2.save()
             try:
-                wm.log_event(e2, p)
+                wa.log_event(e2, u)
             except Exception, instance:
                 self.assertEqual(u'The mandatory event is not associated with'\
                         ' the current state', instance.args[0])
@@ -580,15 +634,16 @@ class ModelTestCase(TestCase):
             # workflow history properly
             tr2 = Transition.objects.get(id=2)
             s3 = State.objects.get(id=3)
-            wm.progress(tr2, p)
-            wh = wm.log_event(e2, p)
+            wa.progress(tr2, u)
+            wh = wa.log_event(e2, u)
             self.assertEqual(s3, wh.state)
             self.assertEqual(e2, wh.event)
             self.assertEqual(p, wh.participant)
             self.assertEqual(e2.name, wh.note)
+            self.assertEqual(WorkflowHistory.EVENT, wh.log_type)
             # Lets log a second event of this type and make sure we handle the
             # bespoke note
-            wh = wm.log_event(e2, p, 'A Test')
+            wh = wa.log_event(e2, u, 'A Test')
             self.assertEqual(s3, wh.state)
             self.assertEqual(e2, wh.event)
             self.assertEqual(p, wh.participant)
@@ -596,11 +651,283 @@ class ModelTestCase(TestCase):
             # Finally, make sure we can log a generic event (not associated with
             # a particular workflow, state or set of roles)
             e3 = Event.objects.get(id=4)
-            wh = wm.log_event(e3, p, 'Another test')
+            wh = wa.log_event(e3, u, 'Another test')
             self.assertEqual(s3, wh.state)
             self.assertEqual(e3, wh.event)
             self.assertEqual(p, wh.participant)
             self.assertEqual('Another test', wh.note)
+
+        def test_workflowactivity_add_comment(self):
+            """
+            Make sure we can add comments to the workflow history via the
+            WorkflowActivity instance
+            """
+            w = Workflow.objects.get(id=1)
+            u = User.objects.get(id=1)
+            r = Role.objects.get(id=1)
+            wa = WorkflowActivity(workflow=w, created_by=u)
+            wa.save()
+            p = Participant(user=u, workflowactivity=wa)
+            p.save()
+            p.roles.add(r)
+            # Test we can add a comment to an un-started workflow
+            wh = wa.add_comment(u, 'test')
+            self.assertEqual('test', wh.note)
+            self.assertEqual(p, wh.participant)
+            self.assertEqual(WorkflowHistory.COMMENT, wh.log_type)
+            self.assertEqual(None, wh.state)
+            # Start the workflow and add a comment
+            wa.start(p)
+            s = State.objects.get(id=1)
+            wh = wa.add_comment(u, 'test2')
+            self.assertEqual('test2', wh.note)
+            self.assertEqual(p, wh.participant)
+            self.assertEqual(WorkflowHistory.COMMENT, wh.log_type)
+            self.assertEqual(s, wh.state)
+            # Add a comment from an unknown user
+            u2 = User.objects.get(id=2)
+            wh = wa.add_comment(u2, 'test3')
+            self.assertEqual('test3', wh.note)
+            self.assertEqual(u2, wh.participant.user)
+            self.assertEqual(0, len(wh.participant.roles.all()))
+            self.assertEqual(WorkflowHistory.COMMENT, wh.log_type)
+            self.assertEqual(s, wh.state)
+            # Make sure we can't add an empty comment
+            try:
+                wa.add_comment(u, '')
+            except Exception, instance:
+                self.assertEqual(u'Cannot add an empty comment', instance.args[0])
+            else:
+                self.fail('Exception expected but not thrown')
+
+        def test_workflowactivity_assign_role(self):
+            """
+            Makes sure the appropriate things happen when a role is assigned to
+            a user for a workflow activity
+            """
+            w = Workflow.objects.get(id=1)
+            u = User.objects.get(id=1)
+            r = Role.objects.get(id=1)
+            wa = WorkflowActivity(workflow=w, created_by=u)
+            wa.save()
+            p = Participant(user=u, workflowactivity=wa)
+            p.save()
+            p.roles.add(r)
+            # Lets test we can assign a role *before* the workflow activity is
+            # started
+            u2 = User.objects.get(id=2)
+            wh = wa.assign_role(u, u2, r)
+            self.assertEqual('Role "Administrator" assigned to test_manager',
+                    wh.note)
+            self.assertEqual(p, wh.participant)
+            self.assertEqual(WorkflowHistory.ROLE, wh.log_type)
+            self.assertEqual(None, wh.state)
+            self.assertEqual(None, wh.deadline)
+            # Lets start the workflow activity and try again
+            wa.start(p)
+            s = State.objects.get(id=1)
+            r2 = Role.objects.get(id=2)
+            wh = wa.assign_role(u2, u, r2)
+            self.assertEqual('Role "Manager" assigned to test_admin', wh.note)
+            self.assertEqual(u2, wh.participant.user)
+            self.assertEqual(WorkflowHistory.ROLE, wh.log_type)
+            self.assertEqual(s, wh.state)
+
+        def test_workflowactivity_remove_role(self):
+            """
+            Makes sure the appropriate things happen when a role is removed from
+            a user for a workflow activity
+            """
+            w = Workflow.objects.get(id=1)
+            u = User.objects.get(id=1)
+            r = Role.objects.get(id=1)
+            wa = WorkflowActivity(workflow=w, created_by=u)
+            wa.save()
+            p = Participant(user=u, workflowactivity=wa)
+            p.save()
+            p.roles.add(r)
+            # Lets test we can remove a role *before* the workflow activity is
+            # started
+            u2 = User.objects.get(id=2)
+            p2 = Participant(user=u2, workflowactivity=wa)
+            p2.save()
+            p2.roles.add(r)
+            wh = wa.remove_role(u, u2, r)
+            self.assertEqual('Role "Administrator" removed from test_manager',
+                    wh.note)
+            self.assertEqual(p, wh.participant)
+            self.assertEqual(WorkflowHistory.ROLE, wh.log_type)
+            self.assertEqual(None, wh.state)
+            self.assertEqual(None, wh.deadline)
+            # Lets start the workflow activity and try again
+            wa.start(p)
+            s = State.objects.get(id=1)
+            wh = wa.remove_role(u2, u, r)
+            self.assertEqual('Role "Administrator" removed from test_admin', wh.note)
+            self.assertEqual(u2, wh.participant.user)
+            self.assertEqual(WorkflowHistory.ROLE, wh.log_type)
+            self.assertEqual(s, wh.state)
+            # Lets make sure we return None from trying to remove a role that
+            # isn't associated
+            p.roles.add(r)
+            p2.roles.add(r)
+            r2 = Role.objects.get(id=2)
+            result = wa.remove_role(u, u2, r2)
+            self.assertEqual(None, result)
+            # Lets make sure we return None from trying to use a user who isn't
+            # a participant
+            u3 = User.objects.get(id=3)
+            result = wa.remove_role(u, u3, r)
+            self.assertEqual(None, result)
+
+        def test_workflowactivity_clear_roles(self):
+            """
+            Makes sure the appropriate things happen when a user has all roles
+            cleared against a workflow activity
+            """
+            w = Workflow.objects.get(id=1)
+            u = User.objects.get(id=1)
+            r = Role.objects.get(id=1)
+            wa = WorkflowActivity(workflow=w, created_by=u)
+            wa.save()
+            p = Participant(user=u, workflowactivity=wa)
+            p.save()
+            p.roles.add(r)
+            # Lets test we can clear roles *before* the workflow activity is
+            # started
+            u2 = User.objects.get(id=2)
+            p2 = Participant(user=u2, workflowactivity=wa)
+            p2.save()
+            p2.roles.add(r)
+            wh = wa.clear_roles(u, u2)
+            self.assertEqual('All roles removed from test_manager',
+                    wh.note)
+            self.assertEqual(p, wh.participant)
+            self.assertEqual(WorkflowHistory.ROLE, wh.log_type)
+            self.assertEqual(None, wh.state)
+            self.assertEqual(None, wh.deadline)
+            # Lets start the workflow activity and try again
+            wa.start(p)
+            s = State.objects.get(id=1)
+            wh = wa.clear_roles(u2, u)
+            self.assertEqual('All roles removed from test_admin', wh.note)
+            self.assertEqual(u2, wh.participant.user)
+            self.assertEqual(WorkflowHistory.ROLE, wh.log_type)
+            self.assertEqual(s, wh.state)
+            # Lets make sure we return None from trying to use a user who isn't
+            # a participant
+            u3 = User.objects.get(id=3)
+            result = wa.clear_roles(u, u3)
+            self.assertEqual(None, result)
+
+        def test_workflowactivity_disable_participant(self):
+            """
+            Makes sure a participant in a workflow activity is disabled
+            elegantly
+            """
+            w = Workflow.objects.get(id=1)
+            u = User.objects.get(id=1)
+            r = Role.objects.get(id=1)
+            wa = WorkflowActivity(workflow=w, created_by=u)
+            wa.save()
+            p = Participant(user=u, workflowactivity=wa)
+            p.save()
+            p.roles.add(r)
+            # Lets test we can disable a participant *before* the workflow 
+            # activity is started
+            u2 = User.objects.get(id=2)
+            p2 = Participant(user=u2, workflowactivity=wa)
+            p2.save()
+            p2.roles.add(r)
+            wh = wa.disable_participant(u, u2, 'test')
+            self.assertEqual('Participant test_manager disabled with the'\
+                    ' reason: test', wh.note)
+            self.assertEqual(p, wh.participant)
+            self.assertEqual(WorkflowHistory.ROLE, wh.log_type)
+            self.assertEqual(None, wh.state)
+            self.assertEqual(None, wh.deadline)
+            p2.disabled=False
+            p2.save()
+            # Lets start the workflow activity and try again
+            wa.start(p)
+            s = State.objects.get(id=1)
+            wh = wa.disable_participant(u, u2, 'test')
+            self.assertEqual('Participant test_manager disabled with the'\
+                    ' reason: test', wh.note)
+            self.assertEqual(u, wh.participant.user)
+            self.assertEqual(WorkflowHistory.ROLE, wh.log_type)
+            self.assertEqual(s, wh.state)
+            # Make sure we return None if the participant is already disabled
+            result = wa.disable_participant(u, u2, 'test')
+            self.assertEqual(None, result)
+            # Lets make sure we must supply a note
+            try:
+                wa.disable_participant(u, u2, '')
+            except Exception, instance:
+                self.assertEqual(u'Must supply a reason for disabling a'\
+                        ' participant. None given.', instance.args[0])
+            else:
+                self.fail('Exception expected but not thrown')
+            # Lets make sure we return None from trying to disable a user who 
+            # isn't a participant
+            u3 = User.objects.get(id=3)
+            result = wa.disable_participant(u, u3, 'test')
+            self.assertEqual(None, result)
+
+        def test_workflowactivity_enable_participant(self):
+            """
+            Make sure we can re-enable a participant in a workflow activity
+            """
+            w = Workflow.objects.get(id=1)
+            u = User.objects.get(id=1)
+            r = Role.objects.get(id=1)
+            wa = WorkflowActivity(workflow=w, created_by=u)
+            wa.save()
+            p = Participant(user=u, workflowactivity=wa)
+            p.save()
+            p.roles.add(r)
+            # Lets test we can disable a participant *before* the workflow 
+            # activity is started
+            u2 = User.objects.get(id=2)
+            p2 = Participant(user=u2, workflowactivity=wa)
+            p2.save()
+            p2.roles.add(r)
+            p2.disabled=True;
+            p2.save()
+            wh = wa.enable_participant(u, u2, 'test')
+            self.assertEqual('Participant test_manager enabled with the'\
+                    ' reason: test', wh.note)
+            self.assertEqual(p, wh.participant)
+            self.assertEqual(WorkflowHistory.ROLE, wh.log_type)
+            self.assertEqual(None, wh.state)
+            self.assertEqual(None, wh.deadline)
+            p2.disabled=True
+            p2.save()
+            # Lets start the workflow activity and try again
+            wa.start(p)
+            s = State.objects.get(id=1)
+            wh = wa.enable_participant(u, u2, 'test')
+            self.assertEqual('Participant test_manager enabled with the'\
+                    ' reason: test', wh.note)
+            self.assertEqual(u, wh.participant.user)
+            self.assertEqual(WorkflowHistory.ROLE, wh.log_type)
+            self.assertEqual(s, wh.state)
+            # Make sure we return None if the participant is already disabled
+            result = wa.enable_participant(u, u2, 'test')
+            self.assertEqual(None, result)
+            # Lets make sure we must supply a note
+            try:
+                wa.enable_participant(u, u2, '')
+            except Exception, instance:
+                self.assertEqual(u'Must supply a reason for enabling a'\
+                        ' disabled participant. None given.', instance.args[0])
+            else:
+                self.fail('Exception expected but not thrown')
+            # Lets make sure we return None from trying to disable a user who 
+            # isn't a participant
+            u3 = User.objects.get(id=3)
+            result = wa.enable_participant(u, u3, 'test')
+            self.assertEqual(None, result)
 
         def test_workflowactivity_force_stop(self):
             """
@@ -611,21 +938,25 @@ class ModelTestCase(TestCase):
             w = Workflow.objects.get(id=1)
             u = User.objects.get(id=1)
             r = Role.objects.get(id=1)
-            wm = WorkflowActivity(workflow=w, created_by=u)
-            wm.save()
-            p = Participant(user=u, role=r, workflowactivity=wm)
+            wa = WorkflowActivity(workflow=w, created_by=u)
+            wa.save()
+            p = Participant(user=u, workflowactivity=wa)
             p.save()
-            wm.force_stop(p, 'foo')
-            self.assertNotEqual(None, wm.completed_on)
-            self.assertEqual(None, wm.current_state())
+            p.roles.add(r)
+            wa.force_stop(u, 'foo')
+            self.assertNotEqual(None, wa.completed_on)
+            self.assertEqual(None, wa.current_state())
             # Lets make sure we can force_stop an already started workflow
             # activity
-            wm = WorkflowActivity(workflow=w, created_by=u)
-            wm.save()
-            wm.start(p)
-            wm.force_stop(p, 'foo')
-            self.assertNotEqual(None, wm.completed_on)
-            wh = wm.current_state()
+            wa = WorkflowActivity(workflow=w, created_by=u)
+            wa.save()
+            p = Participant(user=u, workflowactivity=wa)
+            p.save()
+            p.roles.add(r)
+            wa.start(p)
+            wa.force_stop(u, 'foo')
+            self.assertNotEqual(None, wa.completed_on)
+            wh = wa.current_state()
             self.assertEqual(p, wh.participant)
             self.assertEqual(u'Workflow forced to stop! Reason given: foo',
                     wh.note)
@@ -639,11 +970,34 @@ class ModelTestCase(TestCase):
             w = Workflow.objects.get(id=1)
             u = User.objects.get(id=1)
             r = Role.objects.get(id=1)
-            wm = WorkflowActivity(workflow=w, created_by=u)
-            wm.save()
-            p = Participant(user=u, role=r, workflowactivity=wm)
+            r2 = Role.objects.get(id=2)
+            wa = WorkflowActivity(workflow=w, created_by=u)
+            wa.save()
+            p = Participant(user=u, workflowactivity=wa)
             p.save()
-            self.assertEquals(u'test_admin (Administrator)', p.__unicode__())
+            p.roles.add(r)
+            self.assertEquals(u'test_admin - Administrator', p.__unicode__())
+            p.roles.add(r2)
+            self.assertEquals(u'test_admin - Administrator, Manager', p.__unicode__())
             p.disabled = True
             p.save()
-            self.assertEquals(u'test_admin (Administrator - disabled)', p.__unicode__())
+            self.assertEquals(u'test_admin - Administrator, Manager (disabled)', p.__unicode__())
+            p.roles.clear()
+            self.assertEquals(u'test_admin - role not assigned (disabled)', p.__unicode__())
+
+        def test_workflow_history_unicode(self):
+            """
+            Make sure the __unicode__() method returns the correct string for
+            workflow history items
+            """
+            w = Workflow.objects.get(id=1)
+            u = User.objects.get(id=1)
+            r = Role.objects.get(id=1)
+            wa = WorkflowActivity(workflow=w, created_by=u)
+            wa.save()
+            p = Participant(user=u, workflowactivity=wa)
+            p.save()
+            p.roles.add(r)
+            wh = wa.start(p)
+            self.assertEqual(u'Started workflow created by test_admin - Administrator', wh.__unicode__())
+
