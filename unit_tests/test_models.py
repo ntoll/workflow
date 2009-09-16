@@ -424,20 +424,23 @@ class ModelTestCase(TestCase):
             # Lets make sure we can't start a workflow that has been stopped
             wa.force_stop(p, 'foo')
             try:
-                wa.start(p)
+                wa.start(u)
             except Exception, instance:
                 self.assertEqual(u'Already completed', instance.args[0])
             else:
                 self.fail('Exception expected but not thrown')
             wa = WorkflowActivity(workflow=w, created_by=u)
             wa.save()
+            p = Participant(user=u, workflowactivity=wa)
+            p.save()
+            p.roles.add(r)
             # Lets make sure we can't start a workflow activity if there isn't
             # a single start state
             s2 = State.objects.get(id=2)
             s2.is_start_state=True
             s2.save()
             try:
-                wa.start(p)
+                wa.start(u)
             except Exception, instance:
                 self.assertEqual(u'Cannot find single start state', 
                         instance.args[0])
@@ -447,7 +450,7 @@ class ModelTestCase(TestCase):
             s2.save()
             # Lets make sure we *can* start it now we only have a single start
             # state
-            wa.start(p)
+            wa.start(u)
             # We should be in the first state
             s1 = State.objects.get(id=1) # From the fixtures
             current_state = wa.current_state()
@@ -457,7 +460,7 @@ class ModelTestCase(TestCase):
             self.assertEqual(p, current_state.participant)
             # Lets make sure we can't "start" the workflowactivity again
             try:
-                wa.start(p)
+                wa.start(u)
             except Exception, instance:
                 self.assertEqual(u'Already started', instance.args[0])
             else:
@@ -953,7 +956,7 @@ class ModelTestCase(TestCase):
             p = Participant(user=u, workflowactivity=wa)
             p.save()
             p.roles.add(r)
-            wa.start(p)
+            wa.start(u)
             wa.force_stop(u, 'foo')
             self.assertNotEqual(None, wa.completed_on)
             wh = wa.current_state()
@@ -983,7 +986,7 @@ class ModelTestCase(TestCase):
             p.save()
             self.assertEquals(u'test_admin - Administrator, Manager (disabled)', p.__unicode__())
             p.roles.clear()
-            self.assertEquals(u'test_admin - role not assigned (disabled)', p.__unicode__())
+            self.assertEquals(u'test_admin (disabled)', p.__unicode__())
 
         def test_workflow_history_unicode(self):
             """

@@ -574,12 +574,14 @@ class Event(models.Model):
     workflow = models.ForeignKey(
             Workflow,
             related_name='events',
-            null=True
+            null=True,
+            blank=True
             )
     state = models.ForeignKey(
             State,
             related_name='events',
-            null=True
+            null=True,
+            blank=True
             )
     # The roles referenced here indicate *who* is supposed to be a part of the
     # event
@@ -630,12 +632,15 @@ class WorkflowActivity(models.Model):
         else:
             return None
 
-    def start(self, participant):
+    def start(self, user):
         """
         Starts a WorkflowActivity by putting it into the start state of the
         workflow defined in the "workflow" field after validating the workflow
         activity is in a state appropriate for "starting"
         """
+        participant = Participant.objects.get(workflowactivity=self, user=user,
+                disabled=False)
+
         start_state_result = State.objects.filter(
                 workflow=self.workflow, 
                 is_start_state=True
@@ -1014,11 +1019,11 @@ class Participant(models.Model):
     def __unicode__(self):
         name = self.user.get_full_name() if self.user.get_full_name() else self.user.username
         if self.roles.all():
-            roles = u', '.join([r.__unicode__() for r in self.roles.all()])
+            roles = u' - ' + u', '.join([r.__unicode__() for r in self.roles.all()])
         else:
-            roles = _('role not assigned')
+            roles = '' 
         disabled = _(' (disabled)') if self.disabled else ''
-        return u"%s - %s%s"%(name, roles, disabled)
+        return u"%s%s%s"%(name, roles, disabled)
 
     class Meta:
         ordering = ['-disabled', 'workflowactivity', 'user',]

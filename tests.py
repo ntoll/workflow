@@ -95,19 +95,25 @@ we can interact with the workflow we defined above.
 
 >>> wa = WorkflowActivity(workflow=wf, created_by=fred)
 >>> wa.save()
+
+Use the built in methods associated with the WorkflowActivity class to ensure
+such changes are appropriately logged in the history.
+
 >>> p1 = Participant()
 >>> p1 = Participant(user=fred, workflowactivity=wa)
 >>> p1.save()
->>> p1.roles.add(author)
 >>> p2 = Participant(user=joe, workflowactivity=wa)
 >>> p2.save()
->>> p2.roles.add(boss)
+>>> wa.assign_role(fred, joe, boss)
+<WorkflowHistory: Role "boss" assigned to joe created by fred>
+>>> wa.assign_role(joe, fred, author)
+<WorkflowHistory: Role "author" assigned to fred created by joe - boss>
 >>> d = Document(title='Had..?', body="Bob, where Alice had had 'had', had had 'had had'; 'had had' had had the examiner's approval", workflow_activity=wa)
 
 Starting the workflow via the workflow activity is easy... notice we have to pass
 the participant and that the method returns the current state.
 
->>> d.workflow_activity.start(p1)
+>>> d.workflow_activity.start(fred)
 <WorkflowHistory: Started workflow created by fred - author>
 
 The WorkflowActivity's current_state() method does exactly what it says. You can
@@ -196,7 +202,8 @@ We'll be up for a Pulitzer by joe
 A great review meeting, loved the punchline! by joe
 Request Approval by fred
 Started workflow by fred
-
+Role "author" assigned to fred by joe
+Role "boss" assigned to joe by fred
 
 Unit tests are found in the unit_tests module. In addition to doctests this file
 is a hook into the Django unit-test framework. 
