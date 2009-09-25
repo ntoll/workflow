@@ -1,0 +1,4 @@
+include AUTHORS
+include LICENSE.txt
+recursive-include workflow/fixtures *.json
+recursive-include workflow/templates/graphviz *.dot
